@@ -94,7 +94,6 @@ and ISimpleTypeDefinition =
     //abstract UnderlyingSystemType = inp.UnderlyingSystemType |> TxTypeSymbol
 
 
-/// Transform a provided namespace definition
 and ISimpleNamespace = 
     abstract NestedNamespaces : ISimpleNamespace[]
     abstract NamespaceName : string

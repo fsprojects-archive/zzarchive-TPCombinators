@@ -15,11 +15,11 @@ open Microsoft.FSharp.Core.CompilerServices
 let Example1 config = 
 
     // This fetches an instance of the type provider we wish to transform. 
-    let CsvProvider(config) = 
+    let CsvProvider = 
         let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
         new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location))
 
-    Clone("FSharp.Data", "MySpace", CsvProvider(config))
+    Clone("FSharp.Data", "MySpace", CsvProvider)
 
 let Example2 config = 
 
