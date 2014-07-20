@@ -102,7 +102,7 @@ and ISimpleNamespace =
 
 and ISimpleTypeProvider = 
     abstract Namespaces : ISimpleNamespace[]
-    abstract GetErasureExpression : MethodBase * Expr[] -> Expr
+    abstract GetInvokerExpression : MethodBase * Expr[] -> Expr
     [<CLIEvent>]
     abstract Invalidate : IEvent<unit>
     inherit System.IDisposable 

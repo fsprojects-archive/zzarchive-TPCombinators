@@ -25,11 +25,6 @@ module private Utils =
     type IWraps<'T> =
          abstract Value : 'T
 
-    let unwrapObj<'T> (x:obj) = 
-        match x with 
-        | :? IWraps<'T> as t -> box t.Value
-        | _ -> x
-
     let unwrap<'T> (x:'T) = 
         match box x with 
         | :? IWraps<'T> as t -> t.Value
@@ -176,6 +171,19 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
         | TyArray(n, arg) -> TyArray(n, TxType arg)
         | TyPointer(arg) -> TyPointer(TxType arg)
 
+    /// Reverse the mapping for types
+    and UnTxType(inp: ISimpleType) = 
+        match inp with 
+        | TyApp(td, args) -> TyApp(UnTxTypeDefinition td, Array.map UnTxType args)
+        | TyArray(n, arg) -> TyArray(n, UnTxType arg)
+        | TyPointer(arg) -> TyPointer(UnTxType arg)
+
+    /// Reverse the mapping for type definitions
+    and UnTxTypeDefinition(res: ISimpleTypeDefinition) = unwrap<ISimpleTypeDefinition> res
+
+    /// Reverse the mapping for method definitions
+    and UnTxMethod(res: ISimpleMethod) = unwrap<ISimpleMethod> res
+
     and TxTypeDefinition(inp: ISimpleTypeDefinition) =
       txTableUniq inp <| fun () ->
         let isTarget =  inp.IsErased
@@ -227,8 +235,26 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
     let TxTypeProviderDefinition (inp: ISimpleTypeProvider) = 
         { new ISimpleTypeProvider with 
             override __.Namespaces = inp.Namespaces |> Array.map TxNamespaceDefinition
-            override __.GetErasureExpression(methodBase, parametersUsingReprTypes) = 
-                inp.GetErasureExpression(unwrap methodBase, parametersUsingReprTypes) 
+
+            // This implementation is awkward due to a design glitch with F# type providers. 
+            // The parameters are in terms of the provided types, when ideally they should be 
+            // in terms of erased types.  We have to unwrap 
+            override __.GetInvokerExpression(syntheticMethodBase, parameters) = 
+                let syntheticMethodBase2 = 
+                    match syntheticMethodBase with 
+                    | :? MethodInfo as x -> UnTxMethod x :> MethodBase
+                    | _ -> syntheticMethodBase
+                let parameterVars2 = 
+                    [| for p in parameters do 
+                          match p with 
+                          | Quotations.Patterns.Var(v) ->  yield Quotations.Var(v.Name, UnTxType v.Type)
+                          | _ -> failwith "unexpected non-var" |]
+                let parameters2 = [| for v in parameterVars2 -> Quotations.Expr.Var v |] 
+                let tab = Map.ofSeq (Array.zip parameterVars2 parameters)
+                let q2 = inp.GetInvokerExpression(syntheticMethodBase2, parameters2) 
+                let q = q2.Substitute (tab.TryFind)
+                q
+
 
             [<CLIEvent>]
             override __.Invalidate = inp.Invalidate 

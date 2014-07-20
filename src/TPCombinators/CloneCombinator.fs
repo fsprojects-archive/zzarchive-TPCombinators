@@ -127,8 +127,8 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
             override __.ToString() = inp.ToString() |> NIX
 
             override __.IsDefined(attributeType, inherited)                       = notRequired "IsDefined" 
-            override __.Invoke(invokeAttr, binder, parametersUsingReprTypes, culture)           = notRequired "Invoke"
-            override __.Invoke(obj, invokeAttr, binder, parametersUsingReprTypes, culture)     = notRequired "Invoke"
+            override __.Invoke(invokeAttr, binder, parameters, culture)           = notRequired "Invoke"
+            override __.Invoke(obj, invokeAttr, binder, parameters, culture)     = notRequired "Invoke"
             override __.ReflectedType                                             = notRequired "ReflectedType"
             override __.GetMethodImplementationFlags()                            = notRequired "GetMethodImplementationFlags"
             override __.MethodHandle                                              = notRequired "MethodHandle"
@@ -168,7 +168,7 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
             override __.ReturnTypeCustomAttributes                            = notRequired "ReturnTypeCustomAttributes"
             override __.GetBaseDefinition()                                   = notRequired "GetBaseDefinition"
             override __.GetMethodImplementationFlags()                        = notRequired "GetMethodImplementationFlags"
-            override __.Invoke(obj, invokeAttr, binder, parametersUsingReprTypes, culture)  = notRequired "Invoke"
+            override __.Invoke(obj, invokeAttr, binder, parameters, culture)  = notRequired "Invoke"
             override __.ReflectedType                                         = notRequired "ReflectedType"
             override __.GetCustomAttributes(inherited)                        = notRequired "GetCustomAttributes"
             override __.GetCustomAttributes(attributeType, inherited)         = notRequired "GetCustomAttributes"
@@ -371,8 +371,22 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
     let TxTypeProviderDefinition (inp: ITypeProvider) = 
         { new ITypeProvider with 
             override __.GetNamespaces() = inp.GetNamespaces() |> Array.map TxNamespaceDefinition
-            override __.GetInvokerExpression(methodBase, parametersUsingReprTypes) = 
-                inp.GetInvokerExpression(unwrap methodBase, parametersUsingReprTypes) 
+
+            override __.GetInvokerExpression(syntheticMethodBase, parameters) = 
+                let syntheticMethodBase2 = 
+                    match syntheticMethodBase with 
+                    | :? MethodInfo as x -> unwrap x :> MethodBase
+                    | _ -> syntheticMethodBase
+                let parameterVars2 = 
+                    [| for p in parameters do 
+                          match p with 
+                          | Quotations.Patterns.Var(v) ->  yield Quotations.Var(v.Name, unwrap v.Type)
+                          | _ -> failwith "unexpected non-var" |]
+                let parameters2 = [| for v in parameterVars2 -> Quotations.Expr.Var v |] 
+                let tab = Map.ofSeq (Array.zip parameterVars2 parameters)
+                let q2 = inp.GetInvokerExpression(syntheticMethodBase2, parameters2) 
+                let q = q2.Substitute (tab.TryFind)
+                q
 
             override __.GetStaticParameters(typeWithoutArguments) = 
                 inp.GetStaticParameters(unwrap typeWithoutArguments) |> Array.map TxStaticParameter
@@ -398,12 +412,12 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
 
 
     (*
-        static override convType (parametersUsingReprTypes: Type list) (ty:Type) = 
+        static override convType (parameters: Type list) (ty:Type) = 
             if ty.IsGenericType then 
-                let args = Array.map (ProvidedSymbolType.convType parametersUsingReprTypes) (ty.GetGenericArguments())
+                let args = Array.map (ProvidedSymbolType.convType parameters) (ty.GetGenericArguments())
                 ProvidedSymbolType(Generic (ty.GetGenericTypeDefinition()), Array.toList args)  :> Type
             elif ty.HasElementType then 
-                let ety = ProvidedSymbolType.convType parametersUsingReprTypes (ty.GetElementType()) 
+                let ety = ProvidedSymbolType.convType parameters (ty.GetElementType()) 
                 if ty.IsArray then 
                     let rank = ty.GetArrayRank()
                     if rank = 1 then ProvidedSymbolType(SDArray,[ety]) :> Type
@@ -412,8 +426,8 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
                 elif ty.IsByRef then ProvidedSymbolType(ByRef,[ety]) :> Type
                 else ty
             elif ty.IsGenericParameter then 
-                if ty.GenericParameterPosition <= parametersUsingReprTypes.Length - 1 then 
-                    parametersUsingReprTypes.[ty.GenericParameterPosition]
+                if ty.GenericParameterPosition <= parameters.Length - 1 then 
+                    parameters.[ty.GenericParameterPosition]
                 else
                     ty
             else ty
@@ -511,7 +525,7 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
             override __.GetBaseDefinition()                                       = notRequired "GetBaseDefinition"
             override __.GetMethodImplementationFlags()                            = notRequired "GetMethodImplementationFlags"
             override __.MethodHandle                                              = notRequired "MethodHandle"
-            override __.Invoke(obj, invokeAttr, binder, parametersUsingReprTypes, culture) = notRequired "Invoke"
+            override __.Invoke(obj, invokeAttr, binder, parameters, culture) = notRequired "Invoke"
             override __.ReflectedType                                             = notRequired "ReflectedType"
             override __.GetCustomAttributes(inherited)                            = notRequired "GetCustomAttributes"
             override __.GetCustomAttributes(attributeType, inherited)             =  notRequired "GetCustomAttributes" 
