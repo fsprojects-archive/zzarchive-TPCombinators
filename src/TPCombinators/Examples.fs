@@ -3,6 +3,7 @@
 
 open FSharp.ProvidedTypes.Combinators
 open FSharp.ProvidedTypes.CloneCombinator
+open FSharp.ProvidedTypes.RegexHideCombinator
 open Microsoft.FSharp.Core.CompilerServices
 
 
@@ -22,8 +23,13 @@ let Example1 config =
     Clone("FSharp.Data", "MySpace", CsvProvider)
 
 let Example2 config = 
+    
+    let CsvProvider = 
+        let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
+        new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location))
 
-    Clone("MySpace", "MyOtherSpace", Example1(config))
+    let ClonedProvider = Clone("FSharp.Data", "HideSpace", CsvProvider)
+    Hide("Rows", ClonedProvider)
 
 [<TypeProvider>]
 type Example1Provider(config) = inherit TypeProviderExpression(Example1(config))
@@ -33,4 +39,3 @@ type Example2Provider(config) = inherit TypeProviderExpression(Example2(config))
 
 [<assembly:TypeProviderAssembly>] 
 do()
-

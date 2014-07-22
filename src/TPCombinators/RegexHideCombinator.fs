@@ -1,4 +1,4 @@
-﻿module FSharp.ProvidedTypes.CloneCombinator
+﻿module FSharp.ProvidedTypes.RegexHideCombinator
 
 
 open System
@@ -12,7 +12,7 @@ open Microsoft.FSharp.Core.CompilerServices
 open FSharp.ProvidedTypes.Combinators
 
 /// Clones namespaces, type providers, types and members provided by tp, renaming namespace nsp1 into namespace nsp2.
-let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) = 
+let Hide(pattern: string, tp: ITypeProvider) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
 
@@ -34,8 +34,8 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
     // For now we just transform ALL erased objects.  This assumes one set of provided types is closed,
     // i.e. doesn't refer to any other provided types.
     let TxAssembly isTarget (a:Assembly) = if isTarget then thisAssembly else a
-    let TxNamespaceName isTarget (ns:string) = if isTarget then ns.ReplacePrefix(nsp1, nsp2) else ns
-    let TxFullTypeName isTarget  (tn:string) = if isTarget then tn.ReplacePrefix(nsp1, nsp2) else tn
+    let TxNamespaceName isTarget (ns:string) = ns //if isTarget then ns.ReplacePrefix(nsp1, nsp2) else ns
+    let TxFullTypeName isTarget  (tn:string) = tn //if isTarget then tn.ReplacePrefix(nsp1, nsp2) else tn
 
 
     let TxCustomAttributeData (inp: CustomAttributeData) =  inp
