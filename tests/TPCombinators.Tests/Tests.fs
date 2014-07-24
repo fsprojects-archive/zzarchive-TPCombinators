@@ -29,3 +29,5 @@ let ``get some data2``() =
             |> Seq.take 10 
     Assert.IsNotNull first10Rows
 
+//let firstRow = res2.Rows |> Seq.head
+//let f = firstRow.Volume

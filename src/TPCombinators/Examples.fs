@@ -28,8 +28,9 @@ let Example2 config =
         let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
         new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location))
 
+    //Clone provider to a new namespace, then hide the provided properties that match a given regex
     let ClonedProvider = Clone("FSharp.Data", "HideSpace", CsvProvider)
-    Hide("Rows", ClonedProvider)
+    Hide("D.te", ClonedProvider)
 
 [<TypeProvider>]
 type Example1Provider(config) = inherit TypeProviderExpression(Example1(config))

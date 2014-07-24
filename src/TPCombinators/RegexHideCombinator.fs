@@ -10,6 +10,7 @@ open System.Linq.Expressions
 open System.Collections.Generic
 open Microsoft.FSharp.Core.CompilerServices
 open FSharp.ProvidedTypes.Combinators
+open System.Text.RegularExpressions
 
 /// Clones namespaces, type providers, types and members provided by tp, renaming namespace nsp1 into namespace nsp2.
 let Hide(pattern: string, tp: ITypeProvider) = 
@@ -115,6 +116,7 @@ let Hide(pattern: string, tp: ITypeProvider) =
         }
 
     and TxMethodDefinition(inp: MethodInfo) =
+    
         if inp = null then null else
         { new MethodInfo() with 
 
@@ -152,7 +154,14 @@ let Hide(pattern: string, tp: ITypeProvider) =
               member x.Value = inp
         }
 
+    and TxMethodFilter(inp: MethodInfo) =
+        if inp.Name.[0..3] = "get_" && Regex.IsMatch(inp.Name.[4..], pattern) then
+            false 
+        else 
+            true
+
     and TxPropertyDefinition(inp:PropertyInfo) = 
+
         if inp = null then null else
         { new PropertyInfo() with 
 
@@ -186,6 +195,13 @@ let Hide(pattern: string, tp: ITypeProvider) =
           interface IWraps<PropertyInfo> with 
               member x.Value = inp
         }
+
+    and TxPropertyFilter(inp: PropertyInfo) = 
+        
+        if Regex.IsMatch(inp.Name, pattern) then
+            false
+        else
+            true
 
     and TxEventDefinition(inp: EventInfo) = 
         if inp = null then null else
@@ -265,12 +281,16 @@ let Hide(pattern: string, tp: ITypeProvider) =
             override __.GetInterfaces() = inp.GetInterfaces() |> Array.map TxTypeSymbol
 
             override __.GetConstructors(bindingAttrUnused) = inp.GetConstructors (bindingAttrUnused) |> Array.map TxConstructorDefinition
-            override __.GetMethods(bindingAttrUnused) = inp.GetMethods(bindingAttrUnused) |> Array.map TxMethodDefinition
+            override __.GetMethods(bindingAttrUnused) = inp.GetMethods(bindingAttrUnused) 
+                                                                        |> Array.filter TxMethodFilter
+                                                                        |> Array.map TxMethodDefinition
             override __.GetField(name, bindingAttrUnused) = inp.GetField(name, bindingAttrUnused) |> TxFieldDefinition
             override __.GetFields(bindingAttrUnused) = inp.GetFields(bindingAttrUnused) |> Array.map TxFieldDefinition
             override __.GetEvent(name, bindingAttrUnused) = inp.GetEvent(name, bindingAttrUnused) |> TxEventDefinition
             override __.GetEvents(bindingAttrUnused) = inp.GetEvents(bindingAttrUnused) |> Array.map TxEventDefinition
-            override __.GetProperties(bindingAttrUnused) = inp.GetProperties(bindingAttrUnused) |> Array.map TxPropertyDefinition
+            override __.GetProperties(bindingAttrUnused) = inp.GetProperties(bindingAttrUnused) 
+                                                              |> Array.filter TxPropertyFilter
+                                                              |> Array.map TxPropertyDefinition
             override __.GetMembers(bindingAttrUnused) = inp.GetMembers(bindingAttrUnused) |> Array.map TxMemberDefinition
             override __.GetNestedTypes(bindingAttrUnused) = inp.GetNestedTypes(bindingAttrUnused) |> Array.map TxTypeSymbol
             override __.GetNestedType(name, bindingAttrUnused) = inp.GetNestedType(name, bindingAttrUnused) |> TxTypeSymbol
@@ -323,6 +343,8 @@ let Hide(pattern: string, tp: ITypeProvider) =
 
     /// Transform a provided member definition
     and TxMemberDefinition(inp: MemberInfo) =
+        
+       
         if inp = null then null else
         match inp with 
         | :? MethodInfo as x -> (TxMethodDefinition x) :> MemberInfo
