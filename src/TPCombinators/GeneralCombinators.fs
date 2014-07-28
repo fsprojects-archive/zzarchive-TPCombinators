@@ -5,6 +5,32 @@ open System.Reflection
 open System.Collections.Generic
 open Microsoft.FSharp.Core.CompilerServices
 
+[<AutoOpen>]
+module internal Utils = 
+    let notRequired msg = failwith ("not required: " + msg)
+    let NIX x = x   // Inner --> Outer
+    let XIN x = x   // Outer --> Inner
+
+    /// Indicates that an object is a simple wrapper for another object of the indicated type,
+    /// used for implementing equality in terms of the underlying wrapped objects.
+    type IWraps<'T> =
+         abstract Value : 'T
+
+    let unwrapObj<'T> (x:obj) = 
+        match x with 
+        | :? IWraps<'T> as t -> box t.Value
+        | _ -> x
+
+    let unwrap<'T> (x:'T) = 
+        match box x with 
+        | :? IWraps<'T> as t -> t.Value
+        | _ -> x
+
+type System.String with 
+    member s.ReplacePrefix (s1:string, s2:string) =  
+        if s.StartsWith(s1) then s2 + s.[s1.Length..] else s
+
+
 /// A base type suitable for implementing a type provider component based on a computed ITypeProvider instance.
 type TypeProviderExpression (inp: ITypeProvider) = 
 
