@@ -240,10 +240,10 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
             // The parameters are in terms of the provided types, when ideally they should be 
             // in terms of erased types.  We have to unwrap 
             override __.GetInvokerExpression(syntheticMethodBase, parameters) = 
-                let syntheticMethodBase2 = 
-                    match syntheticMethodBase with 
-                    | :? MethodInfo as x -> UnTxMethod x :> MethodBase
-                    | _ -> syntheticMethodBase
+                failwith "NYI"
+
+(*
+                let syntheticMethodBase2 =  UnTxMethod syntheticMethodBase 
                 let parameterVars2 = 
                     [| for p in parameters do 
                           match p with 
@@ -254,6 +254,7 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
                 let q2 = inp.GetInvokerExpression(syntheticMethodBase2, parameters2) 
                 let q = q2.Substitute (tab.TryFind)
                 q
+*)
 
 
             [<CLIEvent>]
@@ -264,4 +265,5 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
         }
     
     TxTypeProviderDefinition(tp)
+
 

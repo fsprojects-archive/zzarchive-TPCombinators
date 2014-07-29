@@ -26,8 +26,8 @@
     <DocumentationFile>..\..\bin\TPCombinators.XML</DocumentationFile>
     <StartAction>Program</StartAction>
     <StartProgram>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\devenv.exe</StartProgram>
-    <StartArguments>C:\GitHub\victor-dumitrescu\TPCombinators\TPCombinators.Tests.sln</StartArguments>
-    <StartWorkingDirectory>C:\GitHub\victor-dumitrescu\TPCombinators\docs\content</StartWorkingDirectory>
+    <StartArguments>C:\GitHub\fsprojects\TPCombinators\TPCombinators.Tests.sln</StartArguments>
+    <StartWorkingDirectory>C:\GitHub\fsprojects\TPCombinators\docs\content</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -62,21 +62,21 @@
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
   <ItemGroup>
-    <Compile Include="ProvidedTypes-0.4.fsi" />
-    <Compile Include="ProvidedTypes-0.4.fs" />
     <Compile Include="GeneralCombinators.fs" />
+    <Compile Include="RegexHideCombinator.fs" />
     <Compile Include="CloneCombinator.fs" />
     <Compile Include="Examples.fs" />
-    <Content Include="packages.config" />
-    <Compile Include="RegexHideCombinator.fs" />
     <Compile Include="SimplifiedAlgebra.fs" />
+    <Compile Include="CloneCombinatorOverSimplifiedAlgebra.fs" />
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Data">
-      <HintPath>..\..\bin\FSharp.Data.dll</HintPath>
+      <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
       <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
@@ -87,8 +87,5 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="TPCombinators">
-      <HintPath>..\..\bin\TPCombinators.dll</HintPath>
-    </Reference>
   </ItemGroup>
 </Project>
