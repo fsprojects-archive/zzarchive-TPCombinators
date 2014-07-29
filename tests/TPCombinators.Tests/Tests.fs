@@ -13,6 +13,7 @@ open NUnit.Framework
 type Stocks = MySpace.CsvProvider<"data/MSFT.csv">
 type Stocks2 = MyOtherSpace.CsvProvider<"data/MSFT.csv">
 type Hide = HideSpace.CsvProvider<"data/MSFT.csv">
+type FileSys = NewSpace.FileSystem<"C:\\">
 
 
 [<Test>]
@@ -39,3 +40,8 @@ let ``Hide desired properties`` () =
     let res2 = Stocks2.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
     let row2 = Seq.head res.Rows
     printfn "%A" row2.Date
+
+[<Test>]
+let ``Try filesystem`` () = 
+    let res = FileSys.GitHub.fsprojects.TPCombinators.tests.``TPCombinators.Tests``.data.``MSFT.csv``.Contains("a")
+    printfn "%A" (res.ToString())

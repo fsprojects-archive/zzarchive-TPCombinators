@@ -26,7 +26,7 @@
     <DocumentationFile>..\..\bin\TPCombinators.XML</DocumentationFile>
     <StartAction>Program</StartAction>
     <StartProgram>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\devenv.exe</StartProgram>
-    <StartArguments>C:\GitHub\fsprojects\TPCombinators\TPCombinators.Tests.sln</StartArguments>
+    <StartArguments>C:\GitHub\victor-dumitrescu\TPCombinators\TPCombinators.Tests.sln</StartArguments>
     <StartWorkingDirectory>C:\GitHub\fsprojects\TPCombinators\docs\content</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -63,6 +63,7 @@
   </Target>
   <ItemGroup>
     <Compile Include="GeneralCombinators.fs" />
+    <Compile Include="ChainCombinator.fs" />
     <Compile Include="RegexHideCombinator.fs" />
     <Compile Include="CloneCombinator.fs" />
     <Compile Include="Examples.fs" />
@@ -80,6 +81,26 @@
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
       <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharp.Management">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.PowerShell">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.PowerShell.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.PowerShell.ExternalRuntime">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.PowerShell.ExternalRuntime.exe</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.WMI">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.WMI.DesignTime">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.DesignTime.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
