@@ -63,6 +63,7 @@
   </Target>
   <ItemGroup>
     <Compile Include="GeneralCombinators.fs" />
+    <Compile Include="AddStaticCombinator.fs" />
     <Compile Include="ChainCombinator.fs" />
     <Compile Include="RegexHideCombinator.fs" />
     <Compile Include="CloneCombinator.fs" />
@@ -84,22 +85,6 @@
     </Reference>
     <Reference Include="FSharp.Management">
       <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharp.Management.PowerShell">
-      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.PowerShell.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharp.Management.PowerShell.ExternalRuntime">
-      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.PowerShell.ExternalRuntime.exe</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharp.Management.WMI">
-      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharp.Management.WMI.DesignTime">
-      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.DesignTime.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />

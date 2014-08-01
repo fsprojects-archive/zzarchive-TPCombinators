@@ -16,6 +16,10 @@ open System.Text.RegularExpressions
 let Hide(pattern: string, tp: ITypeProvider) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
+    let staticParams = tp.GetStaticParameters(tp.GetType())
+//    if staticParams.Length = 1 then
+        
+    
 
     // A table tracking how wrapped type definition objects are translated to cloned objects.
     // Unique wrapped type definition objects must be translated to unique wrapper objects, based 
@@ -316,9 +320,11 @@ let Hide(pattern: string, tp: ITypeProvider) =
                 override __.GetNestedType(name, bindingAttrUnused) = inp.GetNestedType(name, bindingAttrUnused) |> TxTypeSymbol
 
                 override __.GetPropertyImpl(name, bindingAttrUnused, binderUnused, returnTypeUnused, typesUnused, modifiersUnused) = 
-                    inp.GetProperty(name, bindingAttrUnused) |> TxPropertyDefinition
-                    // inp.GetPropertyImpl(name, bindingAttrUnused, binderUnused, returnTypeUnused, typesUnused, modifiersUnused) |> TxPropertyDefinition
-        
+                    inp.GetProperty(name, bindingAttrUnused) 
+                        //Discard property if it matches pattern
+                        |> (fun x -> if Regex.IsMatch(name, pattern) then null else x)
+                        |> TxPropertyDefinition
+                            
                 // Every implementation of System.Type must meaningfully implement these
                 override this.MakeGenericType(args) = ProvidedSymbolType(SymbolKind.Generic this, Array.toList args) :> Type
                 override this.MakeArrayType() = ProvidedSymbolType(SymbolKind.SDArray, [this]) :> Type
