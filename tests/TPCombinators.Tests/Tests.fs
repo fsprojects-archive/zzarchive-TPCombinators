@@ -10,8 +10,8 @@ open System
 open System.IO
 open NUnit.Framework
 
-type Stocks = MySpace.CsvProvider<"data/MSFT.csv">
-type Stocks2 = MyOtherSpace.CsvProvider<"data/MSFT.csv">
+type Stocks = UnsimplifiedExample1.CsvProvider<"data/MSFT.csv">
+type Stocks2 = UnsimplifiedExample2.CsvProvider<"data/MSFT.csv">
 
 
 [<Test>]

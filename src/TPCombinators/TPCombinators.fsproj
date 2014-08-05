@@ -26,8 +26,8 @@
     <DocumentationFile>..\..\bin\TPCombinators.XML</DocumentationFile>
     <StartAction>Program</StartAction>
     <StartProgram>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\devenv.exe</StartProgram>
-    <StartArguments>C:\GitHub\dsyme\TPCombinators\TPCombinators.Tests.sln</StartArguments>
-    <StartWorkingDirectory>C:\GitHub\dsyme\TPCombinators\docs\content</StartWorkingDirectory>
+    <StartArguments>"C:\Users\t-anstev\Documents\Visual Studio 2013\Projects\TPCombinators\tests\TPCombinators.Tests\TPCombinators.Tests.sln"</StartArguments>
+    <StartWorkingDirectory>C:\Users\t-anstev\Documents\Visual Studio 2013\Projects\TPCombinators\tests\TPCombinators.Tests</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -64,9 +64,12 @@
   <ItemGroup>
     <Compile Include="GeneralCombinators.fs" />
     <Compile Include="CloneCombinator.fs" />
-    <Compile Include="Examples.fs" />
+    <Compile Include="ChainCombinator.fs" />
+    <Compile Include="ChainExamples.fs" />
     <Compile Include="SimplifiedAlgebra.fs" />
     <Compile Include="CloneCombinatorOverSimplifiedAlgebra.fs" />
+    <Compile Include="Examples.fs" />
+    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
@@ -76,8 +79,31 @@
       <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="FSharp.Data.DbPedia">
+      <HintPath>..\..\..\FSharp.Data.DbPedia\bin\FSharp.Data.DbPedia.dll</HintPath>
+    </Reference>
     <Reference Include="FSharp.Data.DesignTime">
-      <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
+      <HintPath>..\..\bin\FSharp.Data.DesignTime.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharp.Management">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.PowerShell">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.PowerShell.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.PowerShell.ExternalRuntime">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.PowerShell.ExternalRuntime.exe</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.WMI">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management.WMI.DesignTime">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.DesignTime.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
@@ -85,8 +111,5 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Xml.Linq" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="packages.config" />
   </ItemGroup>
 </Project>

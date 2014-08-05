@@ -20,14 +20,7 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
     // A table tracking how wrapped type definition objects are translated to cloned objects.
     // Unique wrapped type definition objects must be translated to unique wrapper objects, based 
     // on object identity.
-    let txTable = Dictionary<Type, Type>(HashIdentity.Reference)
-    let txTableUniq inp f = 
-        if txTable.ContainsKey inp then 
-            txTable.[inp] 
-        else 
-            let res = f() 
-            txTable.[inp] <- res
-            res
+    let txTable = TxTable<Type, Type>()
 
 
     // The transformation we perform on the assembly. isTarget indicates if this is a provided object we should transform. 
@@ -268,7 +261,7 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
 
     and TxTypeDefinition(inp: Type) =
       if inp = null then null else
-      txTableUniq inp <| fun () ->
+      txTable.Get inp <| fun () ->
         let isTarget =  (inp.Attributes &&& enum (int32 TypeProviderTypeAttributes.IsErased) <> enum 0)
 
         if not isTarget then 
@@ -409,45 +402,4 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
         }
     
     TxTypeProviderDefinition(tp)
-
-(*
-
-    and TxMethodSymbol(inp: MethodInfo) =
-        if inp = null then null else
-        { new MethodInfo() with 
-
-            override __.Name = inp.Name |> NIX
-            override __.Attributes = inp.Attributes |> NIX
-            override __.MemberType = inp.MemberType |> NIX
-
-            override __.IsGenericMethod =  inp.IsGenericMethod |> NIX
-            override __.GetGenericArguments() = inp.GetGenericArguments() |> Array.map TxTypeSymbol
-            override __.GetGenericMethodDefinition() = inp.GetGenericMethodDefinition() |> TxMethodDefinition
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-            override __.MetadataToken = inp.MetadataToken |> NIX
-            override __.CallingConvention = inp.CallingConvention |> NIX
-
-            override __.ReturnType = inp.ReturnType |> TxTypeSymbol
-            override __.GetParameters() = inp.GetParameters() |> Array.map TxParameterDefinition
-            override __.ReturnParameter = inp.ReturnParameter |> TxParameterDefinition
-
-            override __.GetHashCode() = inp.GetHashCode()  |> NIX
-            override __.Equals(that:obj) = inp.Equals(unwrapObj<MethodInfo> that) 
-            override __.ToString() = inp.ToString() |> NIX
-
-            override __.IsDefined(attributeType, inherited)                       = notRequired "IsDefined"
-            override __.ReturnTypeCustomAttributes                                = notRequired "ReturnTypeCustomAttributes"
-            override __.GetBaseDefinition()                                       = notRequired "GetBaseDefinition"
-            override __.GetMethodImplementationFlags()                            = notRequired "GetMethodImplementationFlags"
-            override __.MethodHandle                                              = notRequired "MethodHandle"
-            override __.Invoke(obj, invokeAttr, binder, parameters, culture) = notRequired "Invoke"
-            override __.ReflectedType                                             = notRequired "ReflectedType"
-            override __.GetCustomAttributes(inherited)                            = notRequired "GetCustomAttributes"
-            override __.GetCustomAttributes(attributeType, inherited)             =  notRequired "GetCustomAttributes" 
-
-          interface IWraps<MethodInfo> with 
-              member x.Value = inp
-       }
-
-*)
 

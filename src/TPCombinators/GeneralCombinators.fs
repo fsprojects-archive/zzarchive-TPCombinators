@@ -16,6 +16,16 @@ module internal Utils =
     type IWraps<'T> =
          abstract Value : 'T
 
+    let tryUnwrap<'T> (x:obj) = 
+        match x with 
+        | :? IWraps<'T> as t -> Some t.Value
+        | _ -> None
+
+    let unwrapOther<'T> (x:obj) = 
+        match x with 
+        | :? IWraps<'T> as t -> t.Value
+        | _ -> failwith "unexpected unwrap failure"
+
     let unwrapObj<'T> (x:obj) = 
         match x with 
         | :? IWraps<'T> as t -> box t.Value
@@ -25,6 +35,19 @@ module internal Utils =
         match box x with 
         | :? IWraps<'T> as t -> t.Value
         | _ -> x
+
+    // A table tracking how wrapped type definition objects are translated to cloned objects.
+    // Unique wrapped type definition objects must be translated to unique wrapper objects, based 
+    // on object identity.
+    type TxTable<'T1, 'T2 when 'T1 : not struct>() = 
+        let tab = Dictionary<'T1, 'T2>(HashIdentity.Reference)
+        member __.Get inp f = 
+            if tab.ContainsKey inp then 
+                tab.[inp] 
+            else 
+                let res = f() 
+                tab.[inp] <- res
+                res
 
 type System.String with 
     member s.ReplacePrefix (s1:string, s2:string) =  
@@ -223,7 +246,7 @@ type internal ProvidedSymbolType(kind: SymbolKind, args: Type list) =
     override this.GetInterfaces()                                                                  = notRequired "GetInterfaces" this.Name
     override this.GetEvent(_name, _bindingAttr)                                                      = notRequired "GetEvent" this.Name
     override this.GetEvents _bindingAttr                                                            = notRequired "GetEvents" this.Name
-    override this.GetProperties _bindingAttr                                                        = notRequired "GetProperties" this.Name
+    override this.GetProperties _bindingAttr =   notRequired "GetProperties" this.Name
     override this.GetPropertyImpl(_name, _bindingAttr, _binder, _returnType, _types, _modifiers)         = notRequired "GetPropertyImpl" this.Name
     override this.GetNestedTypes _bindingAttr                                                       = notRequired "GetNestedTypes" this.Name
     override this.GetNestedType(_name, _bindingAttr)                                                 = notRequired "GetNestedType" this.Name

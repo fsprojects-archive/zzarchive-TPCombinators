@@ -1,9 +1,12 @@
 module ChainExamples
 
-open FSharp.ProvidedTypes.Combinators
 open FSharp.ProvidedTypes.CloneCombinator
 open FSharp.ProvidedTypes.ChainCombinator
+open FSharp.ProvidedTypes.GeneralCombinators
 open Microsoft.FSharp.Core.CompilerServices
+
+//FSharp.Data.DbPedia.GetDataContext().Ontology.Activity.Game.Individuals.``7 Wonders (board game)``.
+//let r = FSharp.Data.DbPediaSearch<"Person","Antoine Bauza">.SearchResults()
 
 // In this example, we chain two type providers:
 //
@@ -19,8 +22,11 @@ let CsvDbPedia config =
         let FSharpDataDbPediaAssembly = typeof<FSharp.Data.DbPedia>.Assembly
         new FSharp.Data.DbPediaTypeProvider.DbPediaTypeProvider(ConfigForOtherTypeProvider(config, FSharpDataDbPediaAssembly.Location))
 
-    let RenamedCsvProvider = Clone("FSharp.Data", "Combined", CsvProvider)
-    Chain(RenamedCsvProvider, DbPediaProvider)
+    //let RenamedCsvProvider = Clone("FSharp.Data", "Combined", CsvProvider)
+    //Chain(RenamedCsvProvider, DbPediaProvider)
+    let resolver = DbPediaProvider.FreebaseToDbPedia >> (function None -> None | Some uri -> DbPediaProvider.GetTypeByUri uri)
+    
+    Chain(CsvProvider, resolver)
 
 [<TypeProvider>]
 type CsvDbPediaProvider(config) = inherit TypeProviderExpression(CsvDbPedia(config))

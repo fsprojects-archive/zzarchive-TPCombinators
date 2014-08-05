@@ -12,6 +12,7 @@ open System.Reflection.Emit
 open System.Linq.Expressions
 open System.Collections.Generic
 open Microsoft.FSharp.Core.CompilerServices
+open FSharp.ProvidedTypes.GeneralCombinators
 open FSharp.ProvidedTypes.SimplifiedAlgebra
 
 [<AutoOpen>]
@@ -43,15 +44,7 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
     // A table tracking how wrapped type definition objects are translated to cloned objects.
     // Unique wrapped type definition objects must be translated to unique wrapper objects, based 
     // on object identity.
-    let txTable = Dictionary<ISimpleTypeDefinition, ISimpleTypeDefinition>(HashIdentity.Reference)
-    let txTableUniq inp f = 
-        if txTable.ContainsKey inp then 
-            txTable.[inp] 
-        else 
-            let res = f() 
-            txTable.[inp] <- res
-            res
-
+    let txTable = TxTable<ISimpleTypeDefinition, ISimpleTypeDefinition>()
 
     // The transformation we perform on the assembly. isTarget indicates if this is a provided object we should transform. 
     //
@@ -60,14 +53,8 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
     let TxAssembly isTarget (a:Assembly) = if isTarget then thisAssembly else a
     let TxNamespaceName isTarget (ns:string) = if isTarget then ns.ReplacePrefix(nsp1, nsp2) else ns
 
-    let TxCustomAttributeData (inp: CustomAttributeData) =  inp
-            //{ new CustomAttributeData() with 
-            //    member __.Constructor =  typeof<ParamArrayAttribute>.GetConstructors().[0]
-            //    member __.ConstructorArguments = upcast [| |]
-            //    member __.NamedArguments = upcast [| |] }
 
-    let TxCustomAttributes (inp: CustomAttributeData[]) =
-        inp |> Array.map TxCustomAttributeData 
+    let TxCustomAttributes (inp: seq<CustomAttributeData>) = inp
 
     let rec TxStaticParameter(inp: ISimpleStaticParameter) = 
 
@@ -89,33 +76,29 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
             override __.Name = inp.Name |> NIX
             override __.ParameterType = inp.ParameterType |> TxType
             override __.OptionalValue = inp.OptionalValue |> NIX
-            override __.IsIn = inp.IsIn |> NIX
             override __.IsOut = inp.IsOut |> NIX
             override __.CustomAttributes = inp.CustomAttributes  |> TxCustomAttributes
-
-          interface IWraps<ISimpleParameter> with 
-              member x.Value = inp
         }
  
     and TxConstructor(inp: ISimpleConstructor) = 
         { new ISimpleConstructor with
 
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
+            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
             override __.Parameters = inp.Parameters |> Array.map TxParameter
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-
-          interface IWraps<ISimpleConstructor> with 
-              member x.Value = inp
+            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
         }
 
     and TxMethod(inp: ISimpleMethod) =
         { new ISimpleMethod with 
 
             override __.Name              = inp.Name  |> NIX
+            override __.IsStatic          = inp.IsStatic  |> NIX
             override __.Parameters        = inp.Parameters |> Array.map TxParameter
-            override __.DeclaringType     = inp.DeclaringType  |> TxTypeDefinition
+            //override __.DeclaringType     = inp.DeclaringType  |> TxTypeDefinition
             override __.ReturnType        = inp.ReturnType  |> TxType
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
+            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
 
           interface IWraps<ISimpleMethod> with 
               member x.Value = inp
@@ -125,7 +108,7 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
         { new ISimpleProperty with 
 
             override __.Name = inp.Name |> NIX
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
+            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
             override __.PropertyType = inp.PropertyType |> TxType
             override __.GetMethod = inp.GetMethod |> Option.map TxMethod
             override __.SetMethod = inp.SetMethod |> Option.map TxMethod
@@ -140,7 +123,7 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
         { new ISimpleEvent with 
 
             override __.Name = inp.Name |> NIX
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
+            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
 
             override __.EventHandlerType = inp.EventHandlerType |> TxType
             override __.AddMethod = inp.AddMethod |> TxMethod
@@ -152,25 +135,31 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
               member x.Value = inp
         }
 
-    and TxField(inp: ISimpleField) = 
-        { new ISimpleField with 
+    and TxField(inp: ISimpleLiteralField) = 
+        { new ISimpleLiteralField with 
 
             override __.Name = inp.Name |> NIX
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
+            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
             override __.FieldType = inp.FieldType |> TxType
             override __.LiteralValue  = inp.LiteralValue |> NIX
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
 
-          interface IWraps<ISimpleField> with 
+          interface IWraps<ISimpleLiteralField> with 
               member x.Value = inp
         }
 
     and TxType(inp: ISimpleType) = 
         match inp with 
-        | TyApp(td, args) -> TyApp(TxTypeDefinition td, Array.map TxType args)
+        | TyApp(td, args) -> TyApp(TxTypeDefinitionReference td, Array.map TxType args)
         | TyArray(n, arg) -> TyArray(n, TxType arg)
         | TyPointer(arg) -> TyPointer(TxType arg)
 
+    and TxTypeDefinitionReference inp = 
+        match inp with
+        | ISimpleTypeDefinitionReference.OtherTyDef _ -> inp
+        | ISimpleTypeDefinitionReference.SimpleTyDef x -> SimpleTyDef (TxTypeDefinition x)
+
+(*
     /// Reverse the mapping for types
     and UnTxType(inp: ISimpleType) = 
         match inp with 
@@ -180,18 +169,19 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
 
     /// Reverse the mapping for type definitions
     and UnTxTypeDefinition(res: ISimpleTypeDefinition) = unwrap<ISimpleTypeDefinition> res
+*)
 
     /// Reverse the mapping for method definitions
     and UnTxMethod(res: ISimpleMethod) = unwrap<ISimpleMethod> res
 
     and TxTypeDefinition(inp: ISimpleTypeDefinition) =
-      txTableUniq inp <| fun () ->
-        let isTarget =  inp.IsErased
+      txTable.Get inp <| fun () ->
+        let isTarget =  true
 
         { new ISimpleTypeDefinition with 
             override __.Name = inp.Name |> NIX
             override __.Assembly = inp.Assembly |> TxAssembly isTarget
-            override __.Namespace = inp.Namespace |> TxNamespaceName isTarget
+            override __.Namespace = inp.Namespace |> Option.map (TxNamespaceName isTarget)
             override __.DeclaringType = inp.DeclaringType |> Option.map TxTypeDefinition
 
             override __.BaseType = inp.BaseType |> Option.map TxType
@@ -204,14 +194,13 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
             override __.Properties = inp.Properties |> Array.map TxProperty
             override __.NestedTypes = inp.NestedTypes |> Array.map TxTypeDefinition
 
-            override __.GetField(name) = inp.GetField(name) |> TxField
-            override __.GetEvent(name) = inp.GetEvent(name) |> TxEventDefinition
-            override __.GetNestedType(name) = inp.GetNestedType(name) |> TxTypeDefinition
-            override __.GetProperty(name) = inp.GetProperty(name) |> TxProperty
+            override __.GetField(name) = inp.GetField(name) |> Option.map TxField
+            override __.GetEvent(name) = inp.GetEvent(name) |> Option.map TxEventDefinition
+            override __.GetNestedType(name) = inp.GetNestedType(name) |> Option.map TxTypeDefinition
+            override __.GetProperty(name) = inp.GetProperty(name) |> Option.map TxProperty
 
             //override __.UnderlyingSystemType = inp.UnderlyingSystemType |> TxType
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-            override __.IsErased = inp.IsErased
 
             override __.ApplyStaticArguments(typePathWithArguments, objs) = inp.ApplyStaticArguments(XIN typePathWithArguments, objs) |> TxTypeDefinition
 
@@ -228,34 +217,13 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
             override __.NestedNamespaces = inp.NestedNamespaces |> Array.map TxNamespaceDefinition
             override __.NamespaceName = inp.NamespaceName |> TxNamespaceName true
             override __.TypeDefinitions = inp.TypeDefinitions |> Array.map TxTypeDefinition
-            override __.GetType(name) =  inp.GetType(name) |> TxTypeDefinition
+            override __.GetTypeDefinition(name) =  inp.GetTypeDefinition(name) |> Option.map TxTypeDefinition
          }
 
     /// Transform an input ITypeProvider
     let TxTypeProviderDefinition (inp: ISimpleTypeProvider) = 
         { new ISimpleTypeProvider with 
             override __.Namespaces = inp.Namespaces |> Array.map TxNamespaceDefinition
-
-            // This implementation is awkward due to a design glitch with F# type providers. 
-            // The parameters are in terms of the provided types, when ideally they should be 
-            // in terms of erased types.  We have to unwrap 
-            override __.GetInvokerExpression(syntheticMethodBase, parameters) = 
-                failwith "NYI"
-
-(*
-                let syntheticMethodBase2 =  UnTxMethod syntheticMethodBase 
-                let parameterVars2 = 
-                    [| for p in parameters do 
-                          match p with 
-                          | Quotations.Patterns.Var(v) ->  yield Quotations.Var(v.Name, UnTxType v.Type)
-                          | _ -> failwith "unexpected non-var" |]
-                let parameters2 = [| for v in parameterVars2 -> Quotations.Expr.Var v |] 
-                let tab = Map.ofSeq (Array.zip parameterVars2 parameters)
-                let q2 = inp.GetInvokerExpression(syntheticMethodBase2, parameters2) 
-                let q = q2.Substitute (tab.TryFind)
-                q
-*)
-
 
             [<CLIEvent>]
             override __.Invalidate = inp.Invalidate 
