@@ -20,6 +20,7 @@ module Utils =
     // These are the exact flags passed in by the F# compiler wherever 'bindingFlags' is expected
     // See https://github.com/fsharp/fsharp/blob/99edb9b717d28c0b23af9a6ac6e8b9a978eee005/src/fsharp/est.fs#L455 for example
     let bindingFlags = BindingFlags.DeclaredOnly ||| BindingFlags.Static ||| BindingFlags.Instance ||| BindingFlags.Public
+    let bindingFlagsWithoutDeclaredOnly = BindingFlags.Static ||| BindingFlags.Instance ||| BindingFlags.Public
 
 type ISimpleStaticParameter  = 
     abstract Name : string
@@ -109,7 +110,7 @@ and ISimpleTypeDefinition =
     abstract GetField : name:string -> ISimpleLiteralField option
     abstract GetEvent: name:string -> ISimpleEvent option
     abstract GetProperty : name:string -> ISimpleProperty option
-    abstract GetNestedType : name:string -> ISimpleTypeDefinition option
+    abstract GetNestedType : name:string * declaredOnly: bool -> ISimpleTypeDefinition option
     
     abstract StaticParameters : ISimpleStaticParameter[]
     abstract ApplyStaticArguments : string[] * obj[] -> ISimpleTypeDefinition  
@@ -267,10 +268,10 @@ let Simplify(tp: ITypeProvider) =
             override __.Properties = inp.GetProperties(bindingFlags) |> Array.map TxProperty
             override __.NestedTypes = inp.GetNestedTypes(bindingFlags) |> Array.map TxTypeDefinition
 
-            override __.GetField(name) = inp.GetField(name) |> nullToOption |> Option.map TxField
-            override __.GetEvent(name) = inp.GetEvent(name) |> nullToOption |> Option.map TxEventDefinition
-            override __.GetNestedType(name) = inp.GetNestedType(name) |> nullToOption |> Option.map TxTypeDefinition
-            override __.GetProperty(name) = inp.GetProperty(name) |> nullToOption |> Option.map TxProperty
+            override __.GetField(name) = inp.GetField(name, bindingFlags) |> nullToOption |> Option.map TxField
+            override __.GetEvent(name) = inp.GetEvent(name, bindingFlags) |> nullToOption |> Option.map TxEventDefinition
+            override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, (if declaredOnly then bindingFlags else bindingFlagsWithoutDeclaredOnly)) |> nullToOption |> Option.map TxTypeDefinition
+            override __.GetProperty(name) = inp.GetProperty(name, bindingFlags) |> nullToOption |> Option.map TxProperty
 
             //override __.UnderlyingSystemType = inp.UnderlyingSystemType |> TxType
             override __.CustomAttributes = inp.GetCustomAttributesData() |> TxCustomAttributes
@@ -279,8 +280,6 @@ let Simplify(tp: ITypeProvider) =
 
             override __.StaticParameters = tp.GetStaticParameters(inp) |> Array.map TxStaticParameter
 
-          //interface IWraps<ISimpleTypeDefinition> with 
-          //    member x.Value = inp
         }
 
     /// Transform a provided member definition
@@ -634,23 +633,53 @@ let Desimplify(tp: ISimpleTypeProvider) =
                 override __.BaseType = inp.BaseType |> Option.map TxTypeSymbol |> optionToNull
                 override __.GetInterfaces() = inp.Interfaces |> Array.map TxTypeSymbol
 
-                override this.GetConstructors(bindingAttrUnused) = inp.Constructors |> Array.map (TxConstructorDefinition this)
-                override this.GetMethods(bindingAttrUnused) = inp.Methods |> Array.map (TxMethodDefinition this)
-                override this.GetField(name, bindingAttrUnused) = inp.GetField(name) |> Option.map (TxFieldDefinition this) |> optionToNull
-                override this.GetFields(bindingAttrUnused) = inp.Fields |> Array.map (TxFieldDefinition this)
-                override this.GetEvent(name, bindingAttrUnused) = inp.GetEvent(name) |> Option.map (TxEventDefinition this) |> optionToNull
-                override this.GetEvents(bindingAttrUnused) = inp.Events |> Array.map (TxEventDefinition this)
-                override this.GetProperties(bindingAttrUnused) = inp.Properties |> Array.map (TxPropertyDefinition this)
-                override this.GetMembers(bindingAttrUnused) = 
+                override this.GetConstructors(bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.Constructors |> Array.map (TxConstructorDefinition this)
+
+                override this.GetMethods(bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.Methods |> Array.map (TxMethodDefinition this)
+
+                override this.GetField(name, bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.GetField(name) |> Option.map (TxFieldDefinition this) |> optionToNull
+
+                override this.GetFields(bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.Fields |> Array.map (TxFieldDefinition this)
+
+                override this.GetEvent(name, bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.GetEvent(name) |> Option.map (TxEventDefinition this) |> optionToNull
+
+                override this.GetEvents(bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.Events |> Array.map (TxEventDefinition this)
+
+                override this.GetProperties(bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.Properties |> Array.map (TxPropertyDefinition this)
+
+                override this.GetMembers(bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
                     [| for x in this.GetMethods() do yield (x :> MemberInfo)
                        for x in this.GetFields() do yield (x :> MemberInfo)
                        for x in this.GetProperties() do yield (x :> MemberInfo)
                        for x in this.GetEvents() do yield (x :> MemberInfo)
                        for x in this.GetNestedTypes() do yield (x :> MemberInfo) |]
-                override this.GetNestedTypes(bindingAttrUnused) = inp.NestedTypes |> Array.map TxTypeDefinition
-                override this.GetNestedType(name, bindingAttrUnused) = inp.GetNestedType(name) |> Option.map TxTypeDefinition |> optionToNull
+ 
+                override this.GetNestedTypes(bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
+                    inp.NestedTypes |> Array.map TxTypeDefinition
+ 
+                override this.GetNestedType(name, bindingFlagsUnused) = 
+                    assert (bindingFlagsUnused = bindingFlagsWithoutDeclaredOnly || bindingFlagsUnused = bindingFlags)  
+                    let declaredOnly = bindingFlagsUnused.HasFlag(BindingFlags.DeclaredOnly)
+                    inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition |> optionToNull
 
-                override this.GetPropertyImpl(name, bindingAttrUnused, binderUnused, returnTypeUnused, typesUnused, modifiersUnused) = 
+                override this.GetPropertyImpl(name, bindingFlagsUnused, binderUnused, returnTypeUnused, typesUnused, modifiersUnused) = 
+                    assert (bindingFlagsUnused = bindingFlags)
                     inp.GetProperty(name) |> Option.map (TxPropertyDefinition this) |> optionToNull
         
                 // Every implementation of System.Type must meaningfully implement these
@@ -686,10 +715,10 @@ let Desimplify(tp: ISimpleTypeProvider) =
 
                 override __.GetGenericArguments() = notRequired "GetGenericArguments"
                 override __.GetGenericTypeDefinition() = notRequired "GetGenericTypeDefinition"
-                override __.GetMember(name,mt,bindingAttrUnused)                                                      = notRequired "GUID"
+                override __.GetMember(name,mt,bindingFlagsUnused)                                                      = notRequired "GUID"
                 override __.GUID                                                                                      = notRequired "GUID"
-                override __.GetMethodImpl(name, bindingAttrUnused, binder, callConvention, types, modifiers)          = notRequired "GetMethodImpl"
-                override __.GetConstructorImpl(bindingAttrUnused, binder, callConvention, types, modifiers)           = notRequired "GetConstructorImpl"
+                override __.GetMethodImpl(name, bindingFlagsUnused, binder, callConvention, types, modifiers)          = notRequired "GetMethodImpl"
+                override __.GetConstructorImpl(bindingFlagsUnused, binder, callConvention, types, modifiers)           = notRequired "GetConstructorImpl"
                 override __.GetCustomAttributes(inherited)                                                            = notRequired "GetCustomAttributes"
                 override __.GetCustomAttributes(attributeType, inherited)                                             = notRequired "GetCustomAttributes"
                 override __.IsDefined(attributeType, inherited)                                                       = notRequired "IsDefined"
