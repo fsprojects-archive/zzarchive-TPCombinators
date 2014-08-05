@@ -176,7 +176,7 @@ type internal ProvidedSymbolType(kind: SymbolKind, args: Type list) =
     override __.GetGenericTypeDefinition() = (match kind with SymbolKind.Generic e -> e | _ -> invalidOp "non-generic type")
     override __.IsCOMObjectImpl() = false
     override __.HasElementTypeImpl() = (match kind with SymbolKind.Generic _ -> false | _ -> true)
-    override __.GetElementType() = (match kind,args with (SymbolKind.Array _  | SymbolKind.SDArray | SymbolKind.ByRef | SymbolKind.Pointer),[e] -> e | _ -> invalidOp "not an array, pointer or byref type")
+    override __.GetElementType() = (match kind,args with (SymbolKind.Array _  | SymbolKind.SDArray | SymbolKind.ByRef | SymbolKind.Pointer),[e] -> e | _ -> invalidOp "%A, %A: not an array, pointer or byref type" kind args)
     override this.ToString() = this.FullName
 
     override this.Module : Module                                                                  = notRequired "Module" this.Name

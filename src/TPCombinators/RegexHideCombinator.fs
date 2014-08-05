@@ -12,14 +12,15 @@ open FSharp.ProvidedTypes.GeneralCombinators
 open System.Text.RegularExpressions
 
 
+let MatchOptionRegex (inp: string, pattern: string option) =
+    match pattern with
+      | Some(str) -> Regex.IsMatch(inp, str)
+      | None -> true
+
 /// Clones namespaces, type providers, types and members provided by tp, renaming namespace nsp1 into namespace nsp2.
-let Hide(pattern: string, tp: ITypeProvider) = 
+let Hide(pattern: string, show: bool, restriction: string option, tp: ITypeProvider) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
-    let staticParams = tp.GetStaticParameters(tp.GetType())
-//    if staticParams.Length = 1 then
-        
-    
 
     // A table tracking how wrapped type definition objects are translated to cloned objects.
     // Unique wrapped type definition objects must be translated to unique wrapper objects, based 
@@ -32,7 +33,6 @@ let Hide(pattern: string, tp: ITypeProvider) =
             let res = f() 
             txTable.[inp] <- res
             res
-
 
     // The transformation we perform on the assembly. isTarget indicates if this is a provided object we should transform. 
     //
@@ -158,10 +158,18 @@ let Hide(pattern: string, tp: ITypeProvider) =
         }
 
     and TxMethodFilter(inp: MethodInfo) =
-        if inp.Name.[0..3] = "get_" && Regex.IsMatch(inp.Name.[4..], pattern) then
-            false 
-        else 
+        //Never hide static methods
+        if inp.IsStatic then 
             true
+        //Don't hide if a restriction is passed and the type doesn't match it
+        elif not (MatchOptionRegex(inp.ReturnType.FullName, restriction)) then
+            true
+        else
+            //Either show or hide methods that match the regex depending on the value of "show"
+            if inp.Name.[0..3] = "get_" && Regex.IsMatch(inp.Name.[4..], pattern) then
+                show
+            else 
+                not show
 
     and TxPropertyDefinition(inp:PropertyInfo) = 
         if inp = null then null else
@@ -199,11 +207,15 @@ let Hide(pattern: string, tp: ITypeProvider) =
         }
 
     and TxPropertyFilter(inp: PropertyInfo) = 
-        
-        if Regex.IsMatch(inp.Name, pattern) then
-            false
-        else
+        //If the property does not match the restriction regex, show it
+        if not (MatchOptionRegex(inp.PropertyType.ToString(), restriction)) then
             true
+        else
+            //Else, show or hide matching properties depending on the value of "show"
+            if Regex.IsMatch(inp.Name, pattern) then
+                show
+            else
+                not show
 
     and TxEventDefinition(inp: EventInfo) = 
         if inp = null then null else
@@ -320,9 +332,13 @@ let Hide(pattern: string, tp: ITypeProvider) =
                 override __.GetNestedType(name, bindingAttrUnused) = inp.GetNestedType(name, bindingAttrUnused) |> TxTypeSymbol
 
                 override __.GetPropertyImpl(name, bindingAttrUnused, binderUnused, returnTypeUnused, typesUnused, modifiersUnused) = 
-                    inp.GetProperty(name, bindingAttrUnused) 
-                        //Discard property if it matches pattern
-                        |> (fun x -> if Regex.IsMatch(name, pattern) then null else x)
+                    inp.GetProperty(name, bindingAttrUnused)
+                        //Hide or show property if it matches regex
+                        |> (fun x -> if not(MatchOptionRegex(inp.FullName, restriction) ) then x
+                                     elif Regex.IsMatch(name, pattern) then 
+                                      if show then x else null
+                                     else 
+                                      if show then null else x)
                         |> TxPropertyDefinition
                             
                 // Every implementation of System.Type must meaningfully implement these
@@ -390,6 +406,7 @@ let Hide(pattern: string, tp: ITypeProvider) =
             override __.GetTypes() = inp.GetTypes() |> Array.map TxTypeDefinition
             override __.ResolveTypeName(typeName) =  inp.ResolveTypeName(typeName) |> TxTypeDefinition
          }
+
 
     /// Transform an input ITypeProvider
     let TxTypeProviderDefinition (inp: ITypeProvider) = 
