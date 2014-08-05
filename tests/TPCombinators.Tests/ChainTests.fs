@@ -11,56 +11,22 @@ open System.IO
 //open NUnit.Framework
 
 module HyperlinkTests = 
-
     type Original = FSharp.Data.CsvProvider<"hyperlinks.csv">
-    let row = Original.GetSample().Rows |> Seq.head
-    row.Hyperlink
-
-
+    let orows = Original.GetSample().Rows 
+    let olinks = orows |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
 
     type Unsimplified1 = UnsimplifiedExample1.CsvProvider<"hyperlinks.csv">
-    Unsimplified1.GetSample().Rows |> Seq.map (fun x -> x.Hyperlink)
+    let urows = Unsimplified1.GetSample().Rows 
+    let ulinks = urows |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
 
     type Unsimplified2 = UnsimplifiedExample2.CsvProvider<"hyperlinks.csv">
-    let rows2 = Unsimplified2.GetSample().Rows 
-
-    let fake2 : Unsimplified2 = failwith ""
-    let rows2b = fake2.Rows
-    rows2 |> Seq.map (fun x -> x.Hyperlink)
-
+    let urows2 = Unsimplified2.GetSample().Rows 
+    let ulinks2 = urows2 |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
 
     type Simplified1 = SimplifiedExample1.CsvProvider<"hyperlinks.csv">
     let rows = Simplified1.GetSample().Rows 
-
-    let fake : Simplified1 = failwith ""
-    let rowsb = fake.Rows
-
-    rows |> Seq.map (fun x -> x.Hyperlink)
+    let links = rows |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
 
     type Simplified2 = SimplifiedExample2.CsvProvider<"hyperlinks.csv">
-    Simplified2.GetSample().Rows |> Seq.map (fun x -> x.Hyperlink)
-
-    Simplified2.GetSample().Rows |> Seq.map (fun (x,y) -> x)
-
-module MSFTTests = 
-
-    type Original = FSharp.Data.CsvProvider<"data/MSFT.csv">
-    let row = Original.GetSample().Rows |> Seq.head
-    row.Hyperlink
-
-
-
-    type Unsimplified1 = UnsimplifiedExample1.CsvProvider<"data/MSFT.csv">
-    Unsimplified1.GetSample().Rows |> Seq.head
-
-    type Unsimplified2 = UnsimplifiedExample2.CsvProvider<"data/MSFT.csv">
-    Unsimplified2.GetSample().Rows |> Seq.head
-
-
-    type Simplified1 = SimplifiedExample1.CsvProvider<"data/MSFT.csv">
-    Simplified1.GetSample().Rows |> Seq.head
-
-    type Simplified2 = SimplifiedExample2.CsvProvider<"data/MSFT.csv">
-    Simplified2.GetSample().Rows |> Seq.head
-
-    Simplified2.GetSample().Rows |> Seq.map (fun x -> x)
+    let rows2 = Simplified2.GetSample().Rows 
+    let links2 = rows2 |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
