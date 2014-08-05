@@ -13,6 +13,7 @@ open Microsoft.FSharp.Core.CompilerServices
 //     CsvProvider --> DbPediaProvider
 //
 // such that any string value in the CSV file containing a DBpedia resource link will be replaced with a provided type
+(*
 let CsvDbPedia config = 
     let CsvProvider =
         let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
@@ -30,6 +31,7 @@ let CsvDbPedia config =
 
 [<TypeProvider>]
 type CsvDbPediaProvider(config) = inherit TypeProviderExpression(CsvDbPedia(config))
+*)
 
 [<assembly:TypeProviderAssembly>] 
 do()

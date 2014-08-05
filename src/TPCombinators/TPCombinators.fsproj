@@ -25,9 +25,10 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>..\..\bin\TPCombinators.XML</DocumentationFile>
     <StartAction>Program</StartAction>
-    <StartProgram>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\devenv.exe</StartProgram>
-    <StartArguments>"C:\Users\t-anstev\Documents\Visual Studio 2013\Projects\TPCombinators\tests\TPCombinators.Tests\TPCombinators.Tests.sln"</StartArguments>
-    <StartWorkingDirectory>C:\Users\t-anstev\Documents\Visual Studio 2013\Projects\TPCombinators\tests\TPCombinators.Tests</StartWorkingDirectory>
+    <StartProgram Condition="Exists('C:\Program Files (x86)\Microsoft Visual Studio 10.0\Common7\IDE\devenv.exe')">C:\Program Files (x86)\Microsoft Visual Studio 10.0\Common7\IDE\devenv.exe</StartProgram>
+    <StartProgram Condition="Exists('C:\Programs\Development\Visual Studio 2013\Common7\IDE\devenv.exe')">C:\Programs\Development\Visual Studio 2013\Common7\IDE\devenv.exe</StartProgram>
+    <StartArguments>$(SolutionDir)TPCombinators.Tests.sln</StartArguments>
+    <StartWorkingDirectory>$(SolutionDir)tests\TPCombinators.Tests</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -83,7 +84,7 @@
       <HintPath>..\..\..\FSharp.Data.DbPedia\bin\FSharp.Data.DbPedia.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
-      <HintPath>..\..\bin\FSharp.Data.DesignTime.dll</HintPath>
+      <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Management">
       <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.dll</HintPath>
