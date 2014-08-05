@@ -64,10 +64,10 @@
   <ItemGroup>
     <Compile Include="GeneralCombinators.fs" />
     <Compile Include="CloneCombinator.fs" />
-    <Compile Include="ChainCombinator.fs" />
-    <Compile Include="ChainExamples.fs" />
     <Compile Include="SimplifiedAlgebra.fs" />
     <Compile Include="CloneCombinatorOverSimplifiedAlgebra.fs" />
+    <Compile Include="ChainCombinatorSimplified.fs" />
+    <Compile Include="ChainExamples.fs" />
     <Compile Include="Examples.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
