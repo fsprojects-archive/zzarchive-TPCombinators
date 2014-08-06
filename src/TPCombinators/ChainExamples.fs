@@ -59,13 +59,10 @@ let v = c.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``
 //
 //ffff <@ failwith "a" @>
 
-
-
-
 let Lengthify config = 
-
     let dbPediaProvider = DbPediaProvider config 
     let contextCreator (staticArgumentValues:obj[], inpApplied : ISimpleTypeDefinition) =
+        try
                 let dataContextMethod =
                     inpApplied.Methods
                     |> Array.find (fun m -> m.IsStatic && (m.Name = "GetSample" || m.Name = "GetDataContext"))
@@ -73,7 +70,10 @@ let Lengthify config =
                 let dataContextObj = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.EvaluateQuotation(expr)
                 let dataContext = dataContextObj :?> DbPediaAccess.DbPediaDataContextBase
                 dataContext.Connection
-                
+        with
+        | :? System.Collections.Generic.KeyNotFoundException -> 
+            raise (DataContextMethodNotFound(sprintf "The provided type '%s' requires the static method GetDataContext() or GetSample()" inpApplied.Name))
+              
 
     let resolver (connObj:DbPediaAccess.DbPediaConnection,  inp: ISimpleProperty) = 
 
@@ -103,7 +103,7 @@ let Lengthify config =
             override __.GetMethod = Some { new ISimpleAssociatedMethod with member __.GetImplementation(parameters) = getImpl(parameters) }
             override __.SetMethod = None 
         }
-
+        
     
     Clone("FSharp.Data", "Chained", Chain(dbPediaProvider, "abstract", contextCreator, resolver))
 

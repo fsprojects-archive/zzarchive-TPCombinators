@@ -210,7 +210,14 @@ let Chain(tp1: ISimpleTypeProvider, propNameRegEx: string, contextCreator : (obj
         { new ISimpleNamespace with
             override __.NestedNamespaces = inp.NestedNamespaces |> Array.map TxNamespaceDefinition
             override __.NamespaceName = inp.NamespaceName 
-            override __.TypeDefinitions = inp.TypeDefinitions |> Array.map (TxTypeDefinition None)
+            override __.TypeDefinitions = 
+                inp.TypeDefinitions 
+                |> Array.map (fun ty -> 
+                     try   
+                        let ctxtObj = contextCreator ([||], ty)
+                        ty |> TxTypeDefinition (Some ctxtObj)
+                     with
+                     | DataContextMethodNotFound _ -> ty)
             override __.GetTypeDefinition(name) =  inp.GetTypeDefinition(name) |> Option.map (TxTypeDefinition None)
          }
 

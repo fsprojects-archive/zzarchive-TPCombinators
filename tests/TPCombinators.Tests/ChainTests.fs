@@ -58,5 +58,5 @@ module UseChainedWithoutStaticParameters =
 
     let ctxt = Chained.DbPedia.GetDataContext()
     
-    let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract`` // TODO: the translation should apply here too
+    let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
 
