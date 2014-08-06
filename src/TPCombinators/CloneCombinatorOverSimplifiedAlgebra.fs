@@ -29,12 +29,8 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
     let txTable = TxTable<ISimpleTypeDefinition, ISimpleTypeDefinition>()
 
     // The transformation we perform on the assembly. isTarget indicates if this is a provided object we should transform. 
-    //
-    // For now we just transform ALL erased objects.  This assumes one set of provided types is closed,
-    // i.e. doesn't refer to any other provided types.
-    let TxAssembly isTarget (a:Assembly) = if isTarget then thisAssembly else a
-    let TxNamespaceName isTarget (ns:string) = if isTarget then ns.ReplacePrefix(nsp1, nsp2) else ns
-
+    let TxAssembly (a:Assembly) = thisAssembly 
+    let TxNamespaceName (ns:string) = ns.ReplacePrefix(nsp1, nsp2) 
 
     let TxCustomAttributes (inp: seq<CustomAttributeData>) = inp
 
@@ -131,12 +127,11 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
 
     and TxTypeDefinition(inp: ISimpleTypeDefinition) =
       txTable.Get inp <| fun () ->
-        let isTarget =  true
 
         { new ISimpleTypeDefinition with 
             override __.Name = inp.Name 
-            override __.Assembly = inp.Assembly |> TxAssembly isTarget
-            override __.Namespace = inp.Namespace |> Option.map (TxNamespaceName isTarget)
+            override __.Assembly = inp.Assembly |> TxAssembly 
+            override __.Namespace = inp.Namespace |> Option.map TxNamespaceName 
             override __.DeclaringType = inp.DeclaringType |> Option.map TxTypeDefinition
 
             override __.BaseType = inp.BaseType |> Option.map TxType
@@ -151,7 +146,7 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
             override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition
 
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-            override __.ApplyStaticArguments(typePathWithArguments, objs) = inp.ApplyStaticArguments(XIN typePathWithArguments, objs) |> TxTypeDefinition
+            override __.ApplyStaticArguments(typePathWithArguments, objs) = inp.ApplyStaticArguments(typePathWithArguments, objs) |> TxTypeDefinition
             override __.StaticParameters = inp.StaticParameters |> Array.map TxStaticParameter
         }
 
@@ -159,7 +154,7 @@ let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) =
     let rec TxNamespaceDefinition (inp: ISimpleNamespace) = 
         { new ISimpleNamespace with
             override __.NestedNamespaces = inp.NestedNamespaces |> Array.map TxNamespaceDefinition
-            override __.NamespaceName = inp.NamespaceName |> TxNamespaceName true
+            override __.NamespaceName = inp.NamespaceName |> TxNamespaceName 
             override __.TypeDefinitions = inp.TypeDefinitions |> Array.map TxTypeDefinition
             override __.GetTypeDefinition(name) =  inp.GetTypeDefinition(name) |> Option.map TxTypeDefinition
          }

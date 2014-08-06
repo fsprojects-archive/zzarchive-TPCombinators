@@ -87,6 +87,14 @@ and ISimpleType =
     | TyArray of int * ISimpleType
     | TyPointer of ISimpleType
     | TyByRef of ISimpleType
+    member this.IsPrimitive(thatTy: System.Type) =
+        match this with
+        | TyApp(OtherTyDef ty, [| |]) -> ty = thatTy
+        | _ -> false
+
+    static member FromPrimitive(ty: System.Type) =
+        assert ty.IsPrimitive
+        TyApp(OtherTyDef ty, [| |])
 
 and ISimpleTypeDefinitionReference = 
     | SimpleTyDef of ISimpleTypeDefinition
@@ -233,7 +241,15 @@ let Simplify(tp: ITypeProvider) =
 
 
     and TxTypeDefinitionReference(inp: Type) =
-        let isTarget =  (inp.Attributes &&& enum (int32 TypeProviderTypeAttributes.IsErased) <> enum 0)
+        // Only use SimpleTypeDef for references in the trees of type definitions we care about
+        let isTarget =  
+            let isErased = (inp.Attributes &&& enum (int32 TypeProviderTypeAttributes.IsErased) <> enum 0)
+            let rec loop (parentTy : Type) = 
+                match parentTy.DeclaringType with 
+                | null -> txTable.ContainsKey parentTy
+                | x -> loop x 
+            isErased && loop inp
+
         if isTarget then SimpleTyDef (TxTypeDefinition inp)
         else OtherTyDef inp
 
