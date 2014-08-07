@@ -30,3 +30,34 @@ module HyperlinkTests =
     type Simplified2 = SimplifiedExample2.CsvProvider<"hyperlinks.csv">
     let rows2 = Simplified2.GetSample().Rows 
     let links2 = rows2 |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
+
+
+module UseOriginalWithStaticParameters = 
+    type Dbp = FSharp.Data.DbPediaProvider<"en">
+
+    let ctxt = Dbp.GetDataContext()
+
+    let v1 : string = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``
+    let v2 : string = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.``abstract``
+
+module UseChainedWithStaticParameters = 
+    type Dbp = Chained.DbPediaProvider<"en">
+
+    let ctxt = Dbp.GetDataContext()
+
+    let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
+    let v2 : int = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.abstract_look_ma_i_know_it_has_length_277
+
+module UseOriginalWithoutStaticParameters = 
+
+    let ctxt = FSharp.Data.DbPedia.GetDataContext()
+    let v1 : string = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``
+
+
+module UseChainedWithoutStaticParameters = 
+
+    let ctxt = Chained.DbPedia.GetDataContext()
+    
+    let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
+
+

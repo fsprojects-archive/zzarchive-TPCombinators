@@ -65,10 +65,10 @@
   <ItemGroup>
     <Compile Include="GeneralCombinators.fs" />
     <Compile Include="CloneCombinator.fs" />
-    <Compile Include="ChainCombinator.fs" />
-    <Compile Include="ChainExamples.fs" />
     <Compile Include="SimplifiedAlgebra.fs" />
     <Compile Include="CloneCombinatorOverSimplifiedAlgebra.fs" />
+    <Compile Include="ChainCombinatorSimplified.fs" />
+    <Compile Include="ChainExamples.fs" />
     <Compile Include="Examples.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
@@ -81,7 +81,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Data.DbPedia">
-      <HintPath>..\..\..\FSharp.Data.DbPedia\bin\FSharp.Data.DbPedia.dll</HintPath>
+      <HintPath>D:\Local\Public\TPCombinators\lib\FSharp.Data.DbPedia.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
       <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.DesignTime.dll</HintPath>

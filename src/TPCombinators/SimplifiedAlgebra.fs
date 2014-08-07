@@ -47,7 +47,6 @@ and ISimpleConstructor =
 and ISimpleMethod =
     abstract Name              : string
     abstract Parameters        : ISimpleParameter[]
-    //abstract DeclaringType     : ISimpleTypeDefinition 
     abstract ReturnType        : ISimpleType 
     abstract CustomAttributes  : seq<CustomAttributeData>
     abstract IsStatic          : bool
@@ -56,25 +55,28 @@ and ISimpleMethod =
     abstract GetImplementation : Var[] -> Expr
 
 and ISimpleProperty = 
-    abstract Name            : string
-    //abstract DeclaringType   : ISimpleTypeDefinition
+    abstract Name            : string 
+    abstract IsStatic        : bool
     abstract PropertyType    : ISimpleType
-    abstract GetMethod       : ISimpleMethod option
-    abstract SetMethod       : ISimpleMethod option
+    abstract GetMethod       : ISimpleAssociatedMethod option
+    abstract SetMethod       : ISimpleAssociatedMethod option
     abstract IndexParameters : ISimpleParameter[]
     abstract CustomAttributes : seq<CustomAttributeData>
 
+and ISimpleAssociatedMethod =
+    // Unlike GetInvokerExpression the inputs are variables and have types which are representation types (to be checked)
+    abstract GetImplementation : Var[] -> Expr
+
 and ISimpleEvent = 
     abstract Name : string
-    //abstract DeclaringType : ISimpleTypeDefinition
+    abstract IsStatic        : bool
     abstract EventHandlerType : ISimpleType
-    abstract AddMethod : ISimpleMethod
-    abstract RemoveMethod : ISimpleMethod
+    abstract AddMethod : ISimpleAssociatedMethod
+    abstract RemoveMethod : ISimpleAssociatedMethod
     abstract CustomAttributes : seq<CustomAttributeData>
 
 and ISimpleLiteralField  = 
     abstract Name : string  
-    //abstract DeclaringType : ISimpleTypeDefinition 
     abstract FieldType : ISimpleType
     abstract LiteralValue : obj 
     abstract CustomAttributes : seq<CustomAttributeData>
@@ -85,6 +87,14 @@ and ISimpleType =
     | TyArray of int * ISimpleType
     | TyPointer of ISimpleType
     | TyByRef of ISimpleType
+    member this.IsPrimitive(thatTy: System.Type) =
+        match this with
+        | TyApp(OtherTyDef ty, [| |]) -> ty = thatTy
+        | _ -> false
+
+    static member FromPrimitive(ty: System.Type) =
+        assert ty.IsPrimitive
+        TyApp(OtherTyDef ty, [| |])
 
 and ISimpleTypeDefinitionReference = 
     | SimpleTyDef of ISimpleTypeDefinition
@@ -107,9 +117,9 @@ and ISimpleTypeDefinition =
     abstract NestedTypes : ISimpleTypeDefinition[]
 
     // TODO: consider removing these from the simplified model
-    abstract GetField : name:string -> ISimpleLiteralField option
-    abstract GetEvent: name:string -> ISimpleEvent option
-    abstract GetProperty : name:string -> ISimpleProperty option
+    //abstract GetField : name:string -> ISimpleLiteralField option
+    //abstract GetEvent: name:string -> ISimpleEvent option
+    //abstract GetProperty : name:string -> ISimpleProperty option
     abstract GetNestedType : name:string * declaredOnly: bool -> ISimpleTypeDefinition option
     
     abstract StaticParameters : ISimpleStaticParameter[]
@@ -151,7 +161,6 @@ let Simplify(tp: ITypeProvider) =
     let rec TxStaticParameter(inp: ParameterInfo) = 
 
         { new ISimpleStaticParameter with 
-
             override __.Name = inp.Name
             override __.ParameterType = inp.ParameterType 
             override __.OptionalValue = (if inp.IsOptional then Some inp.RawDefaultValue else None)
@@ -160,19 +169,15 @@ let Simplify(tp: ITypeProvider) =
 
     and TxParameter(inp : ParameterInfo) = 
         { new ISimpleParameter with 
-
             override __.Name = inp.Name 
             override __.ParameterType = inp.ParameterType |> TxType
             override __.OptionalValue = (if inp.IsOptional then Some inp.RawDefaultValue else None)
             override __.IsOut = inp.IsOut 
             override __.CustomAttributes = inp.GetCustomAttributesData()  |> TxCustomAttributes
-
         }
  
     and TxConstructor(inp: ConstructorInfo) = 
         { new ISimpleConstructor with
-
-            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
             override __.Parameters = inp.GetParameters() |> Array.map TxParameter
             override __.CustomAttributes = inp.GetCustomAttributesData() |> TxCustomAttributes
             override __.GetImplementation(parametersAfterErasure) = TxGetImplementation(inp, parametersAfterErasure)
@@ -180,60 +185,51 @@ let Simplify(tp: ITypeProvider) =
 
     and TxMethod(inp: MethodInfo) =
         { new ISimpleMethod with 
-
             override __.Name              = inp.Name  
             override __.IsStatic          = inp.IsStatic
             override __.Parameters        = inp.GetParameters() |> Array.map TxParameter
-            //override __.DeclaringType     = inp.DeclaringType  |> TxTypeDefinition
             override __.ReturnType        = inp.ReturnType  |> TxType
             override __.CustomAttributes = inp.GetCustomAttributesData() |> TxCustomAttributes
             override __.GetImplementation(parametersAfterErasure) = TxGetImplementation(inp, parametersAfterErasure)
         }
 
-    and TxGetImplementation(inp: MethodBase, parametersAfterErasure) =
-
-        // TBD
-        //System.Diagnostics.Debugger.Break()
-
+    and TxGetImplementation (inp: MethodBase, parametersAfterErasure) =
         let parametersBeforeErasure = Array.map Expr.Var parametersAfterErasure 
         tp.GetInvokerExpression(inp,  parametersBeforeErasure)
 
+    and TxAssociatedMethod (inp: MethodBase) =
+       { new ISimpleAssociatedMethod with 
+            override __.GetImplementation(parametersAfterErasure) = TxGetImplementation(inp, parametersAfterErasure)
+       }
+
+
     and TxProperty(inp: PropertyInfo) = 
         { new ISimpleProperty with 
-
             override __.Name = inp.Name 
-            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
+            override __.IsStatic = (if inp.CanRead then (inp.GetGetMethod()).IsStatic elif inp.CanWrite then inp.GetSetMethod().IsStatic else false)
             override __.PropertyType = inp.PropertyType |> TxType
-            override __.GetMethod = if inp.CanRead then Some (inp.GetGetMethod() |> TxMethod) else None
-            override __.SetMethod = if inp.CanWrite then Some (inp.GetSetMethod() |> TxMethod) else None
+            override __.GetMethod = if inp.CanRead then Some (inp.GetGetMethod() |> TxAssociatedMethod) else None
+            override __.SetMethod = if inp.CanWrite then Some (inp.GetSetMethod() |> TxAssociatedMethod) else None
             override __.IndexParameters = inp.GetIndexParameters() |> Array.map TxParameter
             override __.CustomAttributes = inp.GetCustomAttributesData() |> TxCustomAttributes
-
         }
 
     and TxEventDefinition(inp: EventInfo) = 
         { new ISimpleEvent with 
-
             override __.Name = inp.Name 
-            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-
+            override __.IsStatic = inp.AddMethod.IsStatic
             override __.EventHandlerType = inp.EventHandlerType |> TxType
-            override __.AddMethod = inp.AddMethod |> TxMethod
-            override __.RemoveMethod = inp.RemoveMethod |> TxMethod
-
+            override __.AddMethod = inp.AddMethod |> TxAssociatedMethod
+            override __.RemoveMethod = inp.RemoveMethod |> TxAssociatedMethod
             override __.CustomAttributes = inp.GetCustomAttributesData() |> TxCustomAttributes
-
         }
 
     and TxField(inp: FieldInfo) = 
         { new ISimpleLiteralField with 
-
             override __.Name = inp.Name 
-            //override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
             override __.FieldType = inp.FieldType |> TxType
             override __.LiteralValue  = (if inp.IsLiteral then inp.GetRawConstantValue() else null)
             override __.CustomAttributes = inp.GetCustomAttributesData() |> TxCustomAttributes
-
         }
 
     and TxType(inp: Type) = 
@@ -245,7 +241,15 @@ let Simplify(tp: ITypeProvider) =
 
 
     and TxTypeDefinitionReference(inp: Type) =
-        let isTarget =  (inp.Attributes &&& enum (int32 TypeProviderTypeAttributes.IsErased) <> enum 0)
+        // Only use SimpleTypeDef for references in the trees of type definitions we care about
+        let isTarget =  
+            let isErased = (inp.Attributes &&& enum (int32 TypeProviderTypeAttributes.IsErased) <> enum 0)
+            let rec loop (parentTy : Type) = 
+                match parentTy.DeclaringType with 
+                | null -> txTable.ContainsKey parentTy
+                | x -> loop x 
+            isErased && loop inp
+
         if isTarget then SimpleTyDef (TxTypeDefinition inp)
         else OtherTyDef inp
 
@@ -262,16 +266,29 @@ let Simplify(tp: ITypeProvider) =
             override __.Interfaces = inp.GetInterfaces() |> Array.map TxType
 
             override __.Constructors = inp.GetConstructors(bindingFlags) |> Array.map TxConstructor
-            override __.Methods = inp.GetMethods(bindingFlags) |> Array.map TxMethod
+            override __.Methods = 
+                let methodToRemove = 
+                    set [ for p in inp.GetProperties(bindingFlags) do
+                            if p.CanRead then yield p.GetGetMethod().Name 
+                            if p.CanWrite then yield p.GetSetMethod().Name 
+                          for e in inp.GetEvents(bindingFlags) do
+                            yield e.GetAddMethod().Name 
+                            yield e.GetRemoveMethod().Name 
+                         ]
+
+                [| for m in inp.GetMethods(bindingFlags) do 
+                      if not (methodToRemove.Contains m.Name) then 
+                           yield TxMethod m |]
+
             override __.Fields = inp.GetFields(bindingFlags) |> Array.map TxField
             override __.Events = inp.GetEvents(bindingFlags) |> Array.map TxEventDefinition
             override __.Properties = inp.GetProperties(bindingFlags) |> Array.map TxProperty
             override __.NestedTypes = inp.GetNestedTypes(bindingFlags) |> Array.map TxTypeDefinition
 
-            override __.GetField(name) = inp.GetField(name, bindingFlags) |> nullToOption |> Option.map TxField
-            override __.GetEvent(name) = inp.GetEvent(name, bindingFlags) |> nullToOption |> Option.map TxEventDefinition
+            //override __.GetField(name) = inp.GetField(name, bindingFlags) |> nullToOption |> Option.map TxField
+            //override __.GetEvent(name) = inp.GetEvent(name, bindingFlags) |> nullToOption |> Option.map TxEventDefinition
             override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, (if declaredOnly then bindingFlags else bindingFlagsWithoutDeclaredOnly)) |> nullToOption |> Option.map TxTypeDefinition
-            override __.GetProperty(name) = inp.GetProperty(name, bindingFlags) |> nullToOption |> Option.map TxProperty
+            //override __.GetProperty(name) = inp.GetProperty(name, bindingFlags) |> nullToOption |> Option.map TxProperty
 
             //override __.UnderlyingSystemType = inp.UnderlyingSystemType |> TxType
             override __.CustomAttributes = inp.GetCustomAttributesData() |> TxCustomAttributes
@@ -344,7 +361,7 @@ let Desimplify(tp: ISimpleTypeProvider) =
         { new ParameterInfo() with 
 
             override __.Name = inp.Name 
-            override __.ParameterType = inp.ParameterType |> TxTypeSymbol
+            override __.ParameterType = inp.ParameterType |> TxType
             override __.Attributes = 
                 (match inp.OptionalValue with None -> ParameterAttributes.None | Some _v -> ParameterAttributes.Optional) |||
                 (if inp.IsOut then ParameterAttributes.Out else ParameterAttributes.None)
@@ -429,7 +446,7 @@ let Desimplify(tp: ISimpleTypeProvider) =
             override __.DeclaringType     = declTy
             override __.MemberType        = MemberTypes.Method
             override __.CallingConvention = CallingConventions.HasThis ||| CallingConventions.Standard // Provided types report this by default
-            override __.ReturnType        = inp.ReturnType |> TxTypeSymbol
+            override __.ReturnType        = inp.ReturnType |> TxType
 
             override __.GetCustomAttributesData() = inp.CustomAttributes |> TxCustomAttributesData
 
@@ -462,17 +479,92 @@ let Desimplify(tp: ISimpleTypeProvider) =
               member x.Value = inp
         }
 
+
+    and TxAssociatedMethodDefinition (nm, isStatic, parameters, returnTy) declTy (inp: ISimpleAssociatedMethod) =
+        { new MethodInfo() with 
+
+            override __.GetParameters()   = parameters  |> Array.map TxParameterDefinition
+            override __.Attributes        = 
+                (if isStatic then MethodAttributes.Static else enum 0) |||
+                MethodAttributes.Public
+            override __.Name              = nm
+            override __.DeclaringType     = declTy
+            override __.MemberType        = MemberTypes.Method
+            override __.CallingConvention = CallingConventions.HasThis ||| CallingConventions.Standard // Provided types report this by default
+            override __.ReturnType        = returnTy |> TxType
+
+            override __.GetCustomAttributesData() = [| |] |> TxCustomAttributesData
+
+            override __.GetHashCode() = hash nm + hashParameterTypes parameters
+            override this.Equals(that:obj) = 
+                match that with 
+                | :? MethodInfo as thatMI -> 
+                    nm = thatMI.Name &&
+                    eqType this.DeclaringType thatMI.DeclaringType &&
+                    match tryUnwrap<ISimpleParameter[]> that with 
+                    | Some thatParameters -> eqParameterTypes parameters thatParameters 
+                    | None -> false
+                | _ -> false
+
+            override __.ToString() = sprintf "provided method %s(...) in type %s" nm declTy.Name
+    
+            override __.MetadataToken = notRequired "MetadataToken"
+            override __.MethodHandle = notRequired "MethodHandle"
+            override __.ReturnParameter   = notRequired "ReturnParameter" // Note, if necessary we can return "null" here
+            override __.IsDefined(attributeType, inherited)                   = notRequired "IsDefined"
+            override __.ReturnTypeCustomAttributes                            = notRequired "ReturnTypeCustomAttributes"
+            override __.GetBaseDefinition()                                   = notRequired "GetBaseDefinition"
+            override __.GetMethodImplementationFlags()                        = notRequired "GetMethodImplementationFlags"
+            override __.Invoke(obj, invokeAttr, binder, parameters, culture)  = notRequired "Invoke"
+            override __.ReflectedType                                         = notRequired "ReflectedType"
+            override __.GetCustomAttributes(inherited)                        = notRequired "GetCustomAttributes"
+            override __.GetCustomAttributes(attributeType, inherited)         = notRequired "GetCustomAttributes"
+
+          // NOTE: See GetInvokerExpression, which probes for this interface
+          interface IWraps<ISimpleAssociatedMethod * ISimpleParameter[]> with 
+              member x.Value = (inp, parameters)
+        }
+
+
+    and MakeAssociatedParam (nm, ty) = 
+        { new ISimpleParameter with
+            override __.Name = nm
+            override __.ParameterType = ty
+            override __.OptionalValue = None
+            override __.IsOut = false
+            override __.CustomAttributes = Seq.empty }
+
+    and MakeVoidTy() = TyApp(OtherTyDef(typeof<System.Void>), [| |])
+
+
+    and TxPropertyGet declTy (inp: ISimpleProperty) (m: ISimpleAssociatedMethod) = 
+        m |> TxAssociatedMethodDefinition ("get_" + inp.Name, inp.IsStatic, inp.IndexParameters, inp.PropertyType) declTy
+
+
+    and TxPropertySet declTy (inp: ISimpleProperty) (m: ISimpleAssociatedMethod) = 
+        m |> TxAssociatedMethodDefinition ("set_" + inp.Name, inp.IsStatic, 
+                                           [| yield! inp.IndexParameters; yield MakeAssociatedParam ("value", inp.PropertyType) |], 
+                                           MakeVoidTy()) declTy
+
     and TxPropertyDefinition declTy (inp: ISimpleProperty) = 
         { new PropertyInfo() with 
 
-            override __.Name = inp.Name 
+            override __.Name = inp.Name
             override __.Attributes = PropertyAttributes.None
             override __.DeclaringType = declTy
             override __.MemberType = MemberTypes.Property
 
-            override __.PropertyType = inp.PropertyType |> TxTypeSymbol
-            override __.GetGetMethod(_nonPublicUnused)= inp.GetMethod |> Option.map (TxMethodDefinition declTy) |> optionToNull
-            override __.GetSetMethod(_nonPublicUnused) = inp.SetMethod |> Option.map (TxMethodDefinition declTy) |> optionToNull
+            override __.PropertyType = inp.PropertyType |> TxType
+            override __.GetGetMethod(_nonPublicUnused)= 
+                inp.GetMethod 
+                |> Option.map (TxPropertyGet declTy inp)
+                |> optionToNull
+
+            override __.GetSetMethod(_nonPublicUnused) = 
+                inp.SetMethod 
+                |> Option.map (TxPropertySet declTy inp)
+                |> optionToNull
+
             override __.GetIndexParameters() = inp.IndexParameters  |> Array.map TxParameterDefinition
 
             override __.CanRead = inp.GetMethod.IsSome
@@ -480,7 +572,7 @@ let Desimplify(tp: ISimpleTypeProvider) =
 
             override __.GetCustomAttributesData() = inp.CustomAttributes |> TxCustomAttributesData
 
-            override __.GetHashCode() = hash inp.Name
+            override this.GetHashCode() = hash inp.Name
             override this.Equals(that:obj) = 
                 match that with 
                 | :? PropertyInfo as thatPI -> 
@@ -502,6 +594,15 @@ let Desimplify(tp: ISimpleTypeProvider) =
               member x.Value = inp
         }
 
+
+    and TxEventAdd declTy (inp: ISimpleEvent) = 
+        inp.AddMethod
+        |> TxAssociatedMethodDefinition ("add_" + inp.Name, inp.IsStatic, [| MakeAssociatedParam("handler", inp.EventHandlerType) |], MakeVoidTy()) declTy 
+
+    and TxEventRemove declTy (inp: ISimpleEvent) = 
+        inp.AddMethod
+        |> TxAssociatedMethodDefinition ("remove_" + inp.Name, inp.IsStatic, [| MakeAssociatedParam("handler", inp.EventHandlerType) |], MakeVoidTy()) declTy 
+
     and TxEventDefinition declTy (inp: ISimpleEvent) = 
         { new EventInfo() with 
 
@@ -509,11 +610,9 @@ let Desimplify(tp: ISimpleTypeProvider) =
             override __.Attributes = EventAttributes.None 
             override __.MemberType = MemberTypes.Event
             override __.DeclaringType = declTy
-
-            override __.EventHandlerType = inp.EventHandlerType |> TxTypeSymbol
-            override __.GetAddMethod(_nonPublicUnused) = inp.AddMethod |> TxMethodDefinition declTy 
-            override __.GetRemoveMethod(_nonPublicUnused) = inp.RemoveMethod |> TxMethodDefinition declTy 
-
+            override __.EventHandlerType = inp.EventHandlerType |> TxType
+            override __.GetAddMethod(_nonPublicUnused) = TxEventAdd declTy inp
+            override __.GetRemoveMethod(_nonPublicUnused) = TxEventRemove declTy inp
             override __.GetCustomAttributesData() = inp.CustomAttributes |> TxCustomAttributesData
 
             override __.GetHashCode() = hash inp.Name
@@ -544,7 +643,7 @@ let Desimplify(tp: ISimpleTypeProvider) =
             override __.MemberType = MemberTypes.Field 
             override __.DeclaringType = declTy
 
-            override __.FieldType = inp.FieldType |> TxTypeSymbol
+            override __.FieldType = inp.FieldType |> TxType
             override __.GetRawConstantValue()  = inp.LiteralValue 
 
             override __.GetCustomAttributesData() = inp.CustomAttributes |> TxCustomAttributesData
@@ -571,7 +670,7 @@ let Desimplify(tp: ISimpleTypeProvider) =
               member x.Value = inp
         }
 
-    and TxTypeSymbol(ty: ISimpleType) = 
+    and TxType(ty: ISimpleType) = 
       
         match ty with 
         | ISimpleType.TyApp(tdef, args) ->
@@ -582,16 +681,16 @@ let Desimplify(tp: ISimpleTypeProvider) =
             match args with 
             | [| |] -> tdefR
             | _ -> 
-                let argsR = Array.map TxTypeSymbol args
+                let argsR = Array.map TxType args
                 ProvidedSymbolType(Generic tdefR, Array.toList argsR)  :> Type
         | ISimpleType.TyArray(rank, arg) ->
-            let argR = TxTypeSymbol arg
+            let argR = TxType arg
             if rank = 1 then ProvidedSymbolType(SDArray,[argR]) :> Type
             else ProvidedSymbolType(Array rank,[argR]) :> Type
         | ISimpleType.TyPointer(arg) ->
-            ProvidedSymbolType(Pointer,[TxTypeSymbol arg]) :> Type
+            ProvidedSymbolType(Pointer,[TxType arg]) :> Type
         | ISimpleType.TyByRef(arg) ->
-            ProvidedSymbolType(ByRef,[TxTypeSymbol arg]) :> Type
+            ProvidedSymbolType(ByRef,[TxType arg]) :> Type
 
     and TxTypeDefinition (inp: ISimpleTypeDefinition) =
       txTable.Get inp <| fun () ->
@@ -630,8 +729,8 @@ let Desimplify(tp: ISimpleTypeProvider) =
                 override __.DeclaringType = inp.DeclaringType |> Option.map TxTypeDefinition |> optionToNull
                 override __.MemberType = if isNested() then MemberTypes.NestedType else MemberTypes.TypeInfo
 
-                override __.BaseType = inp.BaseType |> Option.map TxTypeSymbol |> optionToNull
-                override __.GetInterfaces() = inp.Interfaces |> Array.map TxTypeSymbol
+                override __.BaseType = inp.BaseType |> Option.map TxType |> optionToNull
+                override __.GetInterfaces() = inp.Interfaces |> Array.map TxType
 
                 override this.GetConstructors(bindingFlagsUnused) = 
                     assert (bindingFlagsUnused = bindingFlags)
@@ -639,11 +738,29 @@ let Desimplify(tp: ISimpleTypeProvider) =
 
                 override this.GetMethods(bindingFlagsUnused) = 
                     assert (bindingFlagsUnused = bindingFlags)
-                    inp.Methods |> Array.map (TxMethodDefinition this)
+                    [| for m in inp.Methods do
+                           yield m |> TxMethodDefinition this
+
+                       for p in inp.Properties do 
+                          match p.GetMethod with 
+                          | Some m -> yield TxPropertyGet this p m
+                          | None -> ()
+                          match p.SetMethod with 
+                          | Some m -> yield TxPropertySet this p m
+                          | None -> () 
+
+                       for p in inp.Events do 
+                          yield TxEventAdd this p 
+                          yield TxEventRemove this p 
+                    |]
+
 
                 override this.GetField(name, bindingFlagsUnused) = 
                     assert (bindingFlagsUnused = bindingFlags)
-                    inp.GetField(name) |> Option.map (TxFieldDefinition this) |> optionToNull
+                    inp.Fields
+                    |> Array.tryPick (fun p -> if p.Name = name then Some (TxFieldDefinition this p) else None) 
+                    |> optionToNull
+                    //inp.GetField(name) |> Option.map (TxFieldDefinition this) |> optionToNull
 
                 override this.GetFields(bindingFlagsUnused) = 
                     assert (bindingFlagsUnused = bindingFlags)
@@ -651,7 +768,11 @@ let Desimplify(tp: ISimpleTypeProvider) =
 
                 override this.GetEvent(name, bindingFlagsUnused) = 
                     assert (bindingFlagsUnused = bindingFlags)
-                    inp.GetEvent(name) |> Option.map (TxEventDefinition this) |> optionToNull
+                    inp.Events
+                    |> Array.tryPick (fun p -> if p.Name = name then Some (TxEventDefinition this p) else None) 
+                    |> optionToNull
+
+                    //inp.GetEvent(name) |> Option.map (TxEventDefinition this) |> optionToNull
 
                 override this.GetEvents(bindingFlagsUnused) = 
                     assert (bindingFlagsUnused = bindingFlags)
@@ -680,7 +801,9 @@ let Desimplify(tp: ISimpleTypeProvider) =
 
                 override this.GetPropertyImpl(name, bindingFlagsUnused, binderUnused, returnTypeUnused, typesUnused, modifiersUnused) = 
                     assert (bindingFlagsUnused = bindingFlags)
-                    inp.GetProperty(name) |> Option.map (TxPropertyDefinition this) |> optionToNull
+                    inp.Properties 
+                    |> Array.tryPick (fun p -> if p.Name = name then Some (TxPropertyDefinition this p) else None) 
+                    |> optionToNull
         
                 // Every implementation of System.Type must meaningfully implement these
                 override this.MakeGenericType(args) = ProvidedSymbolType(SymbolKind.Generic this, Array.toList args) :> Type
@@ -754,8 +877,15 @@ let Desimplify(tp: ISimpleTypeProvider) =
             override __.GetInvokerExpression(syntheticMethodBase, parameters) = 
                     let getImpl = 
                         match box syntheticMethodBase with 
+
+                        // NOTE: see the hidden interface inserted by TxMethodDefinition
                         | :? IWraps<ISimpleMethod> as x -> x.Value.GetImplementation
+
+                        // NOTE: see the hidden interface inserted by TxConstructorDefinition
                         | :? IWraps<ISimpleConstructor> as x -> x.Value.GetImplementation
+
+                        // NOTE: see the hidden interface inserted by TxAssociatedMethodDefinition
+                        | :? IWraps<ISimpleAssociatedMethod * ISimpleParameter[]> as x -> (fst x.Value).GetImplementation
                         | _ -> failwith "unexpected - why are we being asked about this method?"
 
 

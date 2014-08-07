@@ -49,6 +49,8 @@ module internal Utils =
                 tab.[inp] <- res
                 res
 
+        member __.ContainsKey inp = tab.ContainsKey inp 
+
 type System.String with 
     member s.ReplacePrefix (s1:string, s2:string) =  
         if s.StartsWith(s1) then s2 + s.[s1.Length..] else s
