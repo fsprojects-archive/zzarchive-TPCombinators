@@ -9,6 +9,7 @@ open System.Linq.Expressions
 open System.Collections.Generic
 open Microsoft.FSharp.Core.CompilerServices
 open FSharp.ProvidedTypes.GeneralCombinators
+open FSharp.ProvidedTypes.SimplifiedAlgebra
 open System.Text.RegularExpressions
 
 
@@ -17,152 +18,48 @@ let MatchOptionRegex (inp: string, pattern: string option) =
       | Some(str) -> Regex.IsMatch(inp, str)
       | None -> true
 
-/// Clones namespaces, type providers, types and members provided by tp, renaming namespace nsp1 into namespace nsp2.
-let Hide(pattern: string, show: bool, restriction: string option, tp: ITypeProvider) = 
+let private FilterProvidedProperties (pattern: string, show: bool, restriction: string option) (tp: ISimpleTypeProvider) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
 
     // A table tracking how wrapped type definition objects are translated to cloned objects.
-    // Unique wrapped type definition objects must be translated to unique wrapper objects, based 
-    // on object identity.
-    let txTable = Dictionary<Type, Type>(HashIdentity.Reference)
-    let txTableUniq inp f = 
-        if txTable.ContainsKey inp then 
-            txTable.[inp] 
-        else 
-            let res = f() 
-            txTable.[inp] <- res
-            res
+    let txTable = TxTable<ISimpleTypeDefinition, ISimpleTypeDefinition>()
 
-    // The transformation we perform on the assembly. isTarget indicates if this is a provided object we should transform. 
-    //
-    // For now we just transform ALL erased objects.  This assumes one set of provided types is closed,
-    // i.e. doesn't refer to any other provided types.
-    let TxAssembly isTarget (a:Assembly) = if isTarget then thisAssembly else a
-    let TxNamespaceName isTarget (ns:string) = ns
-    let TxFullTypeName isTarget  (tn:string) = tn
+    let TxAssembly (a:Assembly) = thisAssembly 
 
+    let TxCustomAttributes (inp: seq<CustomAttributeData>) = inp
 
-    let TxCustomAttributeData (inp: CustomAttributeData) =  inp
-            //{ new CustomAttributeData() with 
-            //    member __.Constructor =  typeof<ParamArrayAttribute>.GetConstructors().[0]
-            //    member __.ConstructorArguments = upcast [| |]
-            //    member __.NamedArguments = upcast [| |] }
-
-    let TxCustomAttributesData (inp: IList<CustomAttributeData>) =
-        inp |> Seq.map TxCustomAttributeData |> Seq.toArray :> IList<_>
-
-    let rec TxStaticParameter(inp: ParameterInfo) = 
-
-        { new ParameterInfo() with 
-
+    let rec TxStaticParameter(inp: ISimpleStaticParameter) = 
+        { new ISimpleStaticParameter with 
             override __.Name = inp.Name
             override __.ParameterType = inp.ParameterType
-            override __.Attributes = inp.Attributes
-            override __.RawDefaultValue = inp.RawDefaultValue
-
-            override __.GetCustomAttributesData() = inp.GetCustomAttributesData()  |> TxCustomAttributesData
-
-            override __.ToString() = inp.ToString() |> NIX
-
-            override __.Position                                      = notRequired "Position" 
-            override __.GetCustomAttributes(inherited)                = notRequired "GetCustomAttributes" 
-            override __.GetCustomAttributes(attributeType, inherited) = notRequired "GetCustomAttributes" 
-
-          interface IWraps<ParameterInfo> with 
-              member x.Value = inp
+            override __.OptionalValue = inp.OptionalValue
+            override __.CustomAttributes = inp.CustomAttributes  |> TxCustomAttributes
         }
 
 
-    and TxParameterDefinition(inp : ParameterInfo) = 
-        if inp = null then null else
-        { new ParameterInfo() with 
-
-            override __.Name = inp.Name |> NIX
-            override __.ParameterType = inp.ParameterType |> TxTypeSymbol
-            override __.Attributes = inp.Attributes  |> NIX
-            override __.RawDefaultValue = inp.RawDefaultValue |> NIX
-
-            override __.GetCustomAttributesData() = inp.GetCustomAttributesData()  |> TxCustomAttributesData
-
-            override __.ToString() = inp.ToString() |> NIX
-
-          interface IWraps<ParameterInfo> with 
-              member x.Value = inp
+    and TxParameter(inp : ISimpleParameter) = 
+        { new ISimpleParameter with 
+            override __.Name = inp.Name 
+            override __.ParameterType = inp.ParameterType |> TxType
+            override __.OptionalValue = inp.OptionalValue 
+            override __.IsOut = inp.IsOut 
+            override __.CustomAttributes = inp.CustomAttributes  |> TxCustomAttributes
         }
  
-    and TxConstructorDefinition(inp: ConstructorInfo) = 
-        if inp = null then null else
-        { new ConstructorInfo() with
-
-            override __.Name = inp.Name |> NIX
-            override __.Attributes = inp.Attributes |> NIX
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-            override __.GetParameters() = inp.GetParameters() |> Array.map TxParameterDefinition
-
-            override __.GetCustomAttributesData() = inp.GetCustomAttributesData() |> TxCustomAttributesData
-
-            override __.GetHashCode() = inp.GetHashCode()  |> NIX
-            override __.Equals(that:obj) = inp.Equals(unwrapObj<ConstructorInfo> that) 
-            override __.ToString() = inp.ToString() |> NIX
-
-            override __.IsDefined(attributeType, inherited)                       = notRequired "IsDefined" 
-            override __.Invoke(invokeAttr, binder, parameters, culture)           = notRequired "Invoke"
-            override __.Invoke(obj, invokeAttr, binder, parameters, culture)     = notRequired "Invoke"
-            override __.ReflectedType                                             = notRequired "ReflectedType"
-            override __.GetMethodImplementationFlags()                            = notRequired "GetMethodImplementationFlags"
-            override __.MethodHandle                                              = notRequired "MethodHandle"
-            override __.GetCustomAttributes(inherited)                            = notRequired "GetCustomAttributes"
-            override __.GetCustomAttributes(attributeType, inherited)             = notRequired "GetCustomAttributes"
-
-          interface IWraps<ConstructorInfo> with 
-              member x.Value = inp
+    and TxConstructor(inp: ISimpleConstructor) = 
+        { new ISimpleConstructor with
+            override __.Parameters = inp.Parameters |> Array.map TxParameter
+            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
+            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
         }
 
-    and TxMethodDefinition(inp: MethodInfo) =
-        if inp = null then null else
-        { new MethodInfo() with 
-
-            override __.GetParameters()   = inp.GetParameters()  |> Array.map TxParameterDefinition
-            override __.Attributes        = inp.Attributes |> NIX
-            override __.Name              = inp.Name  |> NIX
-            override __.DeclaringType     = inp.DeclaringType  |> TxTypeDefinition
-            override __.MemberType        = inp.MemberType  |> NIX
-            override __.CallingConvention = inp.CallingConvention  |> NIX
-            override __.ReturnType        = inp.ReturnType |> TxTypeSymbol
-            override __.ReturnParameter   = inp.ReturnParameter  |> TxParameterDefinition
-
-            // These don't have to return fully accurate results - they are used 
-            // by the F# Quotations library function SpecificCall as a pre-optimization
-            // when comparing methods
-            override __.MetadataToken = inp.MetadataToken |> NIX
-            override __.MethodHandle = inp.MethodHandle |> NIX
-
-            override __.GetCustomAttributesData() = inp.GetCustomAttributesData() |> TxCustomAttributesData
-
-            override __.GetHashCode() = inp.GetHashCode()  |> NIX
-            override __.Equals(that:obj) = inp.Equals(unwrapObj<MethodInfo> that) 
-            override __.ToString() = inp.ToString() |> NIX
-    
-            override __.IsDefined(attributeType, inherited)                   = notRequired "IsDefined"
-            override __.ReturnTypeCustomAttributes                            = notRequired "ReturnTypeCustomAttributes"
-            override __.GetBaseDefinition()                                   = notRequired "GetBaseDefinition"
-            override __.GetMethodImplementationFlags()                        = notRequired "GetMethodImplementationFlags"
-            override __.Invoke(obj, invokeAttr, binder, parameters, culture)  = notRequired "Invoke"
-            override __.ReflectedType                                         = notRequired "ReflectedType"
-            override __.GetCustomAttributes(inherited)                        = notRequired "GetCustomAttributes"
-            override __.GetCustomAttributes(attributeType, inherited)         = notRequired "GetCustomAttributes"
-
-          interface IWraps<MethodInfo> with 
-              member x.Value = inp
-        }
-
-    and TxMethodFilter(inp: MethodInfo) =
+    and TxMethodFilter (declTy: ISimpleTypeDefinition) (inp: ISimpleMethod) =
         //Never hide static methods
         if inp.IsStatic then 
             true
         //Don't hide if a restriction is passed and the type doesn't match it
-        elif not (MatchOptionRegex(inp.ReturnType.FullName, restriction)) then
+        elif not (MatchOptionRegex(declTy.Name + "." + inp.Name, restriction)) then
             true
         else
             //Either show or hide methods that match the regex depending on the value of "show"
@@ -171,44 +68,10 @@ let Hide(pattern: string, show: bool, restriction: string option, tp: ITypeProvi
             else 
                 not show
 
-    and TxPropertyDefinition(inp:PropertyInfo) = 
-        if inp = null then null else
-        { new PropertyInfo() with 
-
-            override __.Name = inp.Name |> NIX
-            override __.Attributes = inp.Attributes |> NIX
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-            override __.MemberType = inp.MemberType |> NIX
-
-            override __.PropertyType = inp.PropertyType |> TxTypeSymbol
-            override __.GetGetMethod(_nonPublicUnused)= inp.GetGetMethod(_nonPublicUnused) |> TxMethodDefinition
-            override __.GetSetMethod(_nonPublicUnused) = inp.GetSetMethod(_nonPublicUnused) |> TxMethodDefinition
-            override __.GetIndexParameters() = inp.GetIndexParameters()  |> Array.map TxParameterDefinition
-
-            override __.CanRead = inp.CanRead |> NIX
-            override __.CanWrite = inp.CanWrite |> NIX
-
-            override __.GetCustomAttributesData() = inp.GetCustomAttributesData() |> TxCustomAttributesData
-
-            override __.GetHashCode() = inp.GetHashCode()  |> NIX
-            override __.Equals(that:obj) = inp.Equals(unwrapObj<PropertyInfo> that) 
-            override __.ToString() = inp.ToString() |> NIX
-
-            override __.GetValue(obj, invokeAttr, binder, index, culture)         = notRequired "GetValue"
-            override __.SetValue(obj, _value, invokeAttr, binder, index, culture) = notRequired "SetValue"
-            override __.GetAccessors(nonPublic)                                   = notRequired "GetAccessors"
-            override __.ReflectedType                                             = notRequired "ReflectedType"
-            override __.GetCustomAttributes(inherited)                            = notRequired "GetCustomAttributes"
-            override __.GetCustomAttributes(attributeType, inherited)             = notRequired "GetCustomAttributes"
-            override __.IsDefined(attributeType, inherited)                       = notRequired "IsDefined"
-
-          interface IWraps<PropertyInfo> with 
-              member x.Value = inp
-        }
-
-    and TxPropertyFilter(inp: PropertyInfo) = 
+    and TxPropertyFilter (declTy: ISimpleTypeDefinition) (inp: ISimpleProperty) = 
         //If the property does not match the restriction regex, show it
-        if not (MatchOptionRegex(inp.PropertyType.ToString(), restriction)) then
+        
+        if not (MatchOptionRegex(declTy.Name(* + "." + inp.Name*), restriction)) then
             true
         else
             //Else, show or hide matching properties depending on the value of "show"
@@ -217,229 +80,108 @@ let Hide(pattern: string, show: bool, restriction: string option, tp: ITypeProvi
             else
                 not show
 
-    and TxEventDefinition(inp: EventInfo) = 
-        if inp = null then null else
-        { new EventInfo() with 
+    and TxMethod(inp: ISimpleMethod) =
+        { new ISimpleMethod with 
 
-            override __.Name = inp.Name |> NIX
-            override __.Attributes = inp.Attributes |> NIX
-            override __.MemberType = inp.MemberType |> NIX
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-
-            override __.EventHandlerType = inp.EventHandlerType |> TxTypeSymbol
-            override __.GetAddMethod(_nonPublicUnused) = inp.GetAddMethod(_nonPublicUnused) |> TxMethodDefinition
-            override __.GetRemoveMethod(_nonPublicUnused) = inp.GetRemoveMethod(_nonPublicUnused) |> TxMethodDefinition
-
-            override __.GetCustomAttributesData() = inp.GetCustomAttributesData() |> TxCustomAttributesData
-
-            override __.GetHashCode() = inp.GetHashCode()  |> NIX
-            override __.Equals(that:obj) = inp.Equals(unwrapObj<EventInfo> that) 
-            override __.ToString() = inp.ToString() |> NIX
-
-            override __.GetRaiseMethod(nonPublic)                      = notRequired "GetRaiseMethod"
-            override __.ReflectedType                                  = notRequired "ReflectedType"
-            override __.GetCustomAttributes(inherited)                 = notRequired "GetCustomAttributes"
-            override __.GetCustomAttributes(attributeType, inherited)  = notRequired "GetCustomAttributes"
-            override __.IsDefined(attributeType, inherited)            = notRequired "IsDefined"
-
-          interface IWraps<EventInfo> with 
-              member x.Value = inp
+            override __.Name              = inp.Name  
+            override __.IsStatic          = inp.IsStatic  
+            override __.Parameters        = inp.Parameters |> Array.map TxParameter
+            override __.ReturnType        = inp.ReturnType  |> TxType
+            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
+            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
         }
 
-    and TxFieldDefinition(inp: FieldInfo) = 
-        if inp = null then null else
-        { new FieldInfo() with 
-
-            override __.Name = inp.Name |> NIX
-            override __.Attributes = inp.Attributes |> NIX
-            override __.MemberType = inp.MemberType |> NIX
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-
-            override __.FieldType = inp.FieldType |> TxTypeSymbol
-            override __.GetRawConstantValue()  = inp.GetRawConstantValue() |> NIX
-
-            override __.GetCustomAttributesData() = inp.GetCustomAttributesData() |> TxCustomAttributesData
-
-            override __.GetHashCode() = inp.GetHashCode()  |> NIX
-            override __.Equals(that:obj) = inp.Equals(unwrapObj<FieldInfo> that) 
-            override __.ToString() = inp.ToString() |> NIX
-    
-            override __.ReflectedType                                          = notRequired "ReflectedType"
-            override __.GetCustomAttributes(inherited)                         = notRequired "GetCustomAttributes"
-            override __.GetCustomAttributes(attributeType, inherited)          = notRequired "GetCustomAttributes"
-            override __.IsDefined(attributeType, inherited)                    = notRequired "IsDefined"
-            override __.SetValue(obj, _value, invokeAttr, binder, culture) = notRequired "SetValue"
-            override __.GetValue(obj)                                         = notRequired "GetValue"
-            override __.FieldHandle                                            = notRequired "FieldHandle"
-
-          interface IWraps<FieldInfo> with 
-              member x.Value = inp
+    and TxAssociatedMethod(inp: ISimpleAssociatedMethod) =
+        { new ISimpleAssociatedMethod with 
+            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
         }
 
-    and TxTypeSymbol(ty: Type) = 
-        if ty = null then null else
-      
-        if ty.IsGenericType then 
-            let args = Array.map TxTypeSymbol (ty.GetGenericArguments())
-            ProvidedSymbolType(Generic (TxTypeDefinition (ty.GetGenericTypeDefinition())), Array.toList args)  :> Type
-        elif ty.HasElementType then 
-            let ety = TxTypeSymbol (ty.GetElementType()) 
-            if ty.IsArray then 
-                let rank = ty.GetArrayRank()
-                if rank = 1 then ProvidedSymbolType(SDArray,[ety]) :> Type
-                else ProvidedSymbolType(Array rank,[ety]) :> Type
-            elif ty.IsPointer then ProvidedSymbolType(Pointer,[ety]) :> Type
-            elif ty.IsByRef then ProvidedSymbolType(ByRef,[ety]) :> Type
-            else ty
-        elif ty.IsGenericParameter then ty
-        else
-            TxTypeDefinition ty
 
-    and TxTypeDefinition(inp: Type) =
-      if inp = null then null else
-      txTableUniq inp <| fun () ->
-        let isTarget =  (inp.Attributes &&& enum (int32 TypeProviderTypeAttributes.IsErased) <> enum 0)
+    and TxProperty(inp: ISimpleProperty) = 
+        { new ISimpleProperty with 
 
-        if not isTarget then 
-            // Don't wrap types that aren't being translated. This applies particularly to types
-            // which F# quotations and the F# compiler are sensitive too such as System.Tuple and System.Int32.
-            inp  
-        else
-            { new Type() with 
-                override __.Name = inp.Name |> NIX
-                override __.Assembly = inp.Assembly |> TxAssembly isTarget
-                override __.FullName = inp.FullName |> TxFullTypeName isTarget
-                override __.Namespace = inp.Namespace |> TxNamespaceName isTarget
-                override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-                override __.MemberType = inp.MemberType |> NIX
+            override __.Name = inp.Name 
+            override __.IsStatic = inp.IsStatic 
+            override __.PropertyType = inp.PropertyType |> TxType
+            override __.GetMethod = inp.GetMethod |> Option.map TxAssociatedMethod
+            override __.SetMethod = inp.SetMethod |> Option.map TxAssociatedMethod
+            override __.IndexParameters = inp.IndexParameters |> Array.map TxParameter
+            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
 
-                override __.BaseType = inp.BaseType |> TxTypeSymbol
-                override __.GetInterfaces() = inp.GetInterfaces() |> Array.map TxTypeSymbol
+        }
 
-                override __.GetConstructors(bindingAttrUnused) = inp.GetConstructors (bindingAttrUnused) |> Array.map TxConstructorDefinition
-                override __.GetMethods(bindingAttrUnused) = inp.GetMethods(bindingAttrUnused) 
-                                                                |> Array.filter TxMethodFilter
-                                                                |> Array.map TxMethodDefinition
-                override __.GetField(name, bindingAttrUnused) = inp.GetField(name, bindingAttrUnused) |> TxFieldDefinition
-                override __.GetFields(bindingAttrUnused) = inp.GetFields(bindingAttrUnused) |> Array.map TxFieldDefinition
-                override __.GetEvent(name, bindingAttrUnused) = inp.GetEvent(name, bindingAttrUnused) |> TxEventDefinition
-                override __.GetEvents(bindingAttrUnused) = inp.GetEvents(bindingAttrUnused) |> Array.map TxEventDefinition
-                override __.GetProperties(bindingAttrUnused) = inp.GetProperties(bindingAttrUnused) 
-                                                                 |> Array.filter TxPropertyFilter
-                                                                 |> Array.map TxPropertyDefinition
-                override __.GetMembers(bindingAttrUnused) = inp.GetMembers(bindingAttrUnused) |> Array.map TxMemberDefinition
-                override __.GetNestedTypes(bindingAttrUnused) = inp.GetNestedTypes(bindingAttrUnused) |> Array.map TxTypeSymbol
-                override __.GetNestedType(name, bindingAttrUnused) = inp.GetNestedType(name, bindingAttrUnused) |> TxTypeSymbol
+    and TxEventDefinition(inp: ISimpleEvent) = 
+        { new ISimpleEvent with 
 
-                override __.GetPropertyImpl(name, bindingAttrUnused, binderUnused, returnTypeUnused, typesUnused, modifiersUnused) = 
-                    inp.GetProperty(name, bindingAttrUnused)
-                        //Hide or show property if it matches regex
-                        |> (fun x -> if not(MatchOptionRegex(inp.FullName, restriction) ) then x
-                                     elif Regex.IsMatch(name, pattern) then 
-                                      if show then x else null
-                                     else 
-                                      if show then null else x)
-                        |> TxPropertyDefinition
-                            
-                // Every implementation of System.Type must meaningfully implement these
-                override this.MakeGenericType(args) = ProvidedSymbolType(SymbolKind.Generic this, Array.toList args) :> Type
-                override this.MakeArrayType() = ProvidedSymbolType(SymbolKind.SDArray, [this]) :> Type
-                override this.MakeArrayType arg = ProvidedSymbolType(SymbolKind.Array arg, [this]) :> Type
-                override this.MakePointerType() = ProvidedSymbolType(SymbolKind.Pointer, [this]) :> Type
-                override this.MakeByRefType() = ProvidedSymbolType(SymbolKind.ByRef, [this]) :> Type
+            override __.Name = inp.Name 
+            override __.IsStatic = inp.IsStatic 
+            override __.EventHandlerType = inp.EventHandlerType |> TxType
+            override __.AddMethod = inp.AddMethod |> TxAssociatedMethod
+            override __.RemoveMethod = inp.RemoveMethod |> TxAssociatedMethod
+            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
+        }
 
-                override __.GetAttributeFlagsImpl() = inp.Attributes |> NIX
+    and TxField(inp: ISimpleLiteralField) = 
+        { new ISimpleLiteralField with 
 
-                override __.IsArrayImpl() = inp.IsArray |> NIX
-                override __.IsByRefImpl() = inp.IsByRef |> NIX
-                override __.IsPointerImpl() = inp.IsPointer |> NIX
-                override __.IsPrimitiveImpl() = inp.IsPrimitive |> NIX
-                override __.IsCOMObjectImpl() = inp.IsCOMObject |> NIX
-                override __.IsGenericType = inp.IsGenericType |> NIX
-                override __.IsGenericTypeDefinition = inp.IsGenericTypeDefinition |> NIX
+            override __.Name = inp.Name 
+            override __.FieldType = inp.FieldType |> TxType
+            override __.LiteralValue  = inp.LiteralValue 
+            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
+        }
 
-                override __.HasElementTypeImpl() = inp.HasElementType |> NIX
-
-                override __.UnderlyingSystemType = inp.UnderlyingSystemType |> TxTypeSymbol
-                override __.GetGenericArguments() = inp.GetGenericArguments() |> Array.map TxTypeSymbol
-                override __.GetGenericTypeDefinition() = inp.GetGenericTypeDefinition() |> TxTypeDefinition
-                override __.GetCustomAttributesData() = inp.GetCustomAttributesData() |> TxCustomAttributesData
-
-                override __.GetHashCode() = inp.GetHashCode()  |> NIX
-                override __.Equals(that:obj) = inp.Equals(unwrapObj<Type> that) 
-                override __.ToString() = inp.ToString() |> NIX
-
-                override __.GetMember(name,mt,bindingAttrUnused)                                                      = notRequired "GUID"
-                override __.GUID                                                                                      = notRequired "GUID"
-                override __.GetMethodImpl(name, bindingAttrUnused, binder, callConvention, types, modifiers)          = notRequired "GetMethodImpl"
-                override __.GetConstructorImpl(bindingAttrUnused, binder, callConvention, types, modifiers)           = notRequired "GetConstructorImpl"
-                override __.GetCustomAttributes(inherited)                                                            = notRequired "GetCustomAttributes"
-                override __.GetCustomAttributes(attributeType, inherited)                                             = notRequired "GetCustomAttributes"
-                override __.IsDefined(attributeType, inherited)                                                       = notRequired "IsDefined"
-                override __.GetInterface(name, ignoreCase)                                                            = notRequired "GetInterface"
-                override __.Module                                                                                    = notRequired "Module" : Module 
-                override __.GetElementType()                                                                          = notRequired "GetElementType"
-                override __.InvokeMember(name, invokeAttr, binder, target, args, modifiers, culture, namedParameters) = notRequired "InvokeMember"
-                override __.AssemblyQualifiedName                                                                     = notRequired "AssemblyQualifiedName"
-
-              interface IWraps<Type> with 
-                  member x.Value = inp
-            }
-
-    /// Transform a provided member definition
-    and TxMemberDefinition(inp: MemberInfo) =
-        if inp = null then null else
+    and TxType(inp: ISimpleType) = 
         match inp with 
-        | :? MethodInfo as x -> (TxMethodDefinition x) :> MemberInfo
-        | :? PropertyInfo as x -> (TxPropertyDefinition x) :> MemberInfo
-        | :? EventInfo as x -> (TxEventDefinition x) :> MemberInfo
-        | :? FieldInfo as x -> (TxFieldDefinition x) :> MemberInfo
-        | :? Type as x -> (TxTypeDefinition x) :> MemberInfo
-        | _ -> failwith "unknown member kind"
+        | TyApp(td, args) -> TyApp(TxTypeDefinitionReference td, Array.map TxType args)
+        | TyArray(n, arg) -> TyArray(n, TxType arg)
+        | TyPointer(arg) -> TyPointer(TxType arg)
+        | TyByRef(arg) -> TyByRef(TxType arg)
 
+    and TxTypeDefinitionReference inp = 
+        match inp with
+        | ISimpleTypeDefinitionReference.OtherTyDef _ -> inp
+        | ISimpleTypeDefinitionReference.SimpleTyDef x -> SimpleTyDef (TxTypeDefinition x)
+
+    and TxTypeDefinition(inp: ISimpleTypeDefinition) =
+      txTable.Get inp <| fun () ->
+        let isTarget =  true
+
+        { new ISimpleTypeDefinition with 
+            override __.Name = inp.Name 
+            override __.Assembly = inp.Assembly |> TxAssembly 
+            override __.Namespace = inp.Namespace 
+            override __.DeclaringType = inp.DeclaringType |> Option.map TxTypeDefinition
+
+            override __.BaseType = inp.BaseType |> Option.map TxType
+            override __.Interfaces = inp.Interfaces |> Array.map TxType
+
+            override __.Constructors = inp.Constructors |> Array.map TxConstructor
+            override this.Methods = inp.Methods (*|> Array.filter (TxMethodFilter this)*) |> Array.map TxMethod 
+
+            override __.Fields = inp.Fields |> Array.map TxField
+            override __.Events = inp.Events |> Array.map TxEventDefinition
+            override this.Properties = inp.Properties |> Array.filter (TxPropertyFilter this) |> Array.map TxProperty
+            override __.NestedTypes = inp.NestedTypes |> Array.map TxTypeDefinition
+            override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition
+
+            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
+            override __.ApplyStaticArguments(typePathWithArguments, objs) = inp.ApplyStaticArguments(XIN typePathWithArguments, objs) |> TxTypeDefinition
+            override __.StaticParameters = inp.StaticParameters |> Array.map TxStaticParameter
+        }
 
     /// Transform a provided namespace definition
-    let rec TxNamespaceDefinition (inp: IProvidedNamespace) = 
-        { new IProvidedNamespace with
-            override __.GetNestedNamespaces() = inp.GetNestedNamespaces() |> Array.map TxNamespaceDefinition
-            override __.NamespaceName = inp.NamespaceName |> TxNamespaceName true
-            override __.GetTypes() = inp.GetTypes() |> Array.map TxTypeDefinition
-            override __.ResolveTypeName(typeName) =  inp.ResolveTypeName(typeName) |> TxTypeDefinition
+    let rec TxNamespaceDefinition (inp: ISimpleNamespace) = 
+        { new ISimpleNamespace with
+            override __.NestedNamespaces = inp.NestedNamespaces |> Array.map TxNamespaceDefinition
+            override __.NamespaceName = inp.NamespaceName 
+            override __.TypeDefinitions = inp.TypeDefinitions |> Array.map TxTypeDefinition
+            override __.GetTypeDefinition(name) =  inp.GetTypeDefinition(name) |> Option.map TxTypeDefinition
          }
 
-
     /// Transform an input ITypeProvider
-    let TxTypeProviderDefinition (inp: ITypeProvider) = 
-        { new ITypeProvider with 
-            override __.GetNamespaces() = inp.GetNamespaces() |> Array.map TxNamespaceDefinition
-
-            override __.GetInvokerExpression(syntheticMethodBase, parameters) = 
-                let syntheticMethodBase2 = 
-                    match syntheticMethodBase with 
-                    | :? MethodInfo as x -> unwrap x :> MethodBase
-                    | :? ConstructorInfo as x -> unwrap x :> MethodBase
-                    | _ -> syntheticMethodBase
-                let parameterVars2 = 
-                    [| for p in parameters do 
-                          match p with 
-                          | Quotations.Patterns.Var(v) ->  yield Quotations.Var(v.Name, unwrap v.Type)
-                          | _ -> failwith "unexpected non-var" |]
-                let parameters2 = [| for v in parameterVars2 -> Quotations.Expr.Var v |] 
-                let tab = Map.ofSeq (Array.zip parameterVars2 parameters)
-                let q2 = inp.GetInvokerExpression(syntheticMethodBase2, parameters2) 
-                let q = q2.Substitute (tab.TryFind)
-                q
-
-            override __.GetStaticParameters(typeWithoutArguments) = 
-                inp.GetStaticParameters(unwrap typeWithoutArguments) |> Array.map TxStaticParameter
-
-            override __.ApplyStaticArguments(typeWithoutArguments, typePathWithArguments, objs) = 
-                let inpApplied = inp.ApplyStaticArguments(unwrap typeWithoutArguments, XIN typePathWithArguments, objs) 
-                let inpWrapped = inpApplied |> TxTypeDefinition
-                inpWrapped
-
-            override __.GetGeneratedAssemblyContents(assembly) = 
-                inp.GetGeneratedAssemblyContents(assembly)
+    let TxTypeProviderDefinition (inp: ISimpleTypeProvider) = 
+        { new ISimpleTypeProvider with 
+            override __.Namespaces = inp.Namespaces |> Array.map TxNamespaceDefinition
 
             [<CLIEvent>]
             override __.Invalidate = inp.Invalidate 
@@ -450,44 +192,15 @@ let Hide(pattern: string, show: bool, restriction: string option, tp: ITypeProvi
     
     TxTypeProviderDefinition(tp)
 
-(*
+let HideProperties (pattern: string) (tp: ISimpleTypeProvider) =
+    FilterProvidedProperties(pattern, false, None) (tp: ISimpleTypeProvider)
 
-    and TxMethodSymbol(inp: MethodInfo) =
-        if inp = null then null else
-        { new MethodInfo() with 
+let HidePropertiesInType (pattern: string, declaring: string) (tp: ISimpleTypeProvider) =
+    FilterProvidedProperties(pattern, false, Some declaring) (tp: ISimpleTypeProvider)
 
-            override __.Name = inp.Name |> NIX
-            override __.Attributes = inp.Attributes |> NIX
-            override __.MemberType = inp.MemberType |> NIX
+let ShowProperties (pattern: string) (tp: ISimpleTypeProvider) =
+    FilterProvidedProperties(pattern, true, None) (tp: ISimpleTypeProvider)
 
-            override __.IsGenericMethod =  inp.IsGenericMethod |> NIX
-            override __.GetGenericArguments() = inp.GetGenericArguments() |> Array.map TxTypeSymbol
-            override __.GetGenericMethodDefinition() = inp.GetGenericMethodDefinition() |> TxMethodDefinition
-            override __.DeclaringType = inp.DeclaringType |> TxTypeDefinition
-            override __.MetadataToken = inp.MetadataToken |> NIX
-            override __.CallingConvention = inp.CallingConvention |> NIX
-
-            override __.ReturnType = inp.ReturnType |> TxTypeSymbol
-            override __.GetParameters() = inp.GetParameters() |> Array.map TxParameterDefinition
-            override __.ReturnParameter = inp.ReturnParameter |> TxParameterDefinition
-
-            override __.GetHashCode() = inp.GetHashCode()  |> NIX
-            override __.Equals(that:obj) = inp.Equals(unwrapObj<MethodInfo> that) 
-            override __.ToString() = inp.ToString() |> NIX
-
-            override __.IsDefined(attributeType, inherited)                       = notRequired "IsDefined"
-            override __.ReturnTypeCustomAttributes                                = notRequired "ReturnTypeCustomAttributes"
-            override __.GetBaseDefinition()                                       = notRequired "GetBaseDefinition"
-            override __.GetMethodImplementationFlags()                            = notRequired "GetMethodImplementationFlags"
-            override __.MethodHandle                                              = notRequired "MethodHandle"
-            override __.Invoke(obj, invokeAttr, binder, parameters, culture) = notRequired "Invoke"
-            override __.ReflectedType                                             = notRequired "ReflectedType"
-            override __.GetCustomAttributes(inherited)                            = notRequired "GetCustomAttributes"
-            override __.GetCustomAttributes(attributeType, inherited)             =  notRequired "GetCustomAttributes" 
-
-          interface IWraps<MethodInfo> with 
-              member x.Value = inp
-       }
-
-*)
+let ShowPropertiesInType (pattern: string, declaring: string) (tp: ISimpleTypeProvider) =
+    FilterProvidedProperties(pattern, true, Some declaring) (tp: ISimpleTypeProvider)
 
