@@ -63,6 +63,7 @@
   </Target>
   <ItemGroup>
     <Compile Include="GeneralCombinators.fs" />
+    <Compile Include="CloneCombinator.fs" />
     <Compile Include="SimplifiedAlgebra.fs" />
     <Compile Include="CloneCombinatorOverSimplifiedAlgebra.fs" />
     <Compile Include="ChainCombinatorSimplified.fs" />

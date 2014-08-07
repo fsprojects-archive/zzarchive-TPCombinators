@@ -45,8 +45,8 @@ module UseChainedWithStaticParameters =
 
     let ctxt = Dbp.GetDataContext()
 
-    let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
-    let v2 : int = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.abstract_look_ma_i_know_it_has_length_277
+    let v1 = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.Sports
+    let v2 = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.``abstract``.``Arts and Entertainment``
 
 module UseOriginalWithoutStaticParameters = 
 

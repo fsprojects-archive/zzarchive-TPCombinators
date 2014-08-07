@@ -152,7 +152,7 @@ let Lengthify config =
             override __.SetMethod = None 
         } |> Some
         
-    Clone("FSharp.Data", "Chained", Chain(dbPediaProvider, contextCreator, resolver))
+    Chain(dbPediaProvider, contextCreator, resolver) |> Clone ("FSharp.Data", "Chained")
 
 [<TypeProvider>]
 type CsvDbPediaProvider(config) = inherit TypeProviderExpression(Lengthify(config) |> Desimplify)

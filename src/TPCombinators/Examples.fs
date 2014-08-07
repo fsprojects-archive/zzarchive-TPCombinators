@@ -89,9 +89,14 @@ module Simplified =
     open FSharp.ProvidedTypes.SimplifiedAlgebra
     open FSharp.ProvidedTypes.CloneCombinatorOverSimplifiedAlgebra
 
-    let Example1 config = Clone("FSharp.Data", "SimplifiedExample1", Simplify (CsvProvider config))
+    let Example1 config = 
+      CsvProvider config
+      |> Simplify
+      |> Clone("FSharp.Data", "SimplifiedExample1")
 
-    let Example2 config = Clone("SimplifiedExample1", "SimplifiedExample2", Example1 config) 
+    let Example2 config = 
+      Example1 config 
+      |> Clone("SimplifiedExample1", "SimplifiedExample2") 
 
 
 [<TypeProvider>]
