@@ -71,6 +71,7 @@ type SimUnsimExampleProvider(config) = inherit TypeProviderExpression(SimplifyUn
 *)
 
 
+(*
 module Unsimplified = 
 
     open FSharp.ProvidedTypes.CloneCombinator
@@ -82,6 +83,14 @@ module Unsimplified =
     let Example2 config = 
 
         Clone("UnsimplifiedExample1", "UnsimplifiedExample2", Example1 config)
+
+[<TypeProvider>]
+type UnsimplifiedExample1Provider(config) = inherit TypeProviderExpression(Unsimplified.Example1(config))
+
+[<TypeProvider>]
+type UnsimplifiedExample2Provider(config) = inherit TypeProviderExpression(Unsimplified.Example2(config))
+
+*)
 
 
 module Simplified = 
@@ -98,12 +107,6 @@ module Simplified =
       Example1 config 
       |> Clone("SimplifiedExample1", "SimplifiedExample2") 
 
-
-[<TypeProvider>]
-type UnsimplifiedExample1Provider(config) = inherit TypeProviderExpression(Unsimplified.Example1(config))
-
-[<TypeProvider>]
-type UnsimplifiedExample2Provider(config) = inherit TypeProviderExpression(Unsimplified.Example2(config))
 
 
 [<TypeProvider>]

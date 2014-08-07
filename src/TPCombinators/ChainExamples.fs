@@ -151,8 +151,10 @@ let Lengthify config =
             override __.GetMethod = Some { new ISimpleAssociatedMethod with member __.GetImplementation(parameters) = getImpl(parameters) }
             override __.SetMethod = None 
         } |> Some
+
+    let chainResolver = { (defaultResolver contextCreator) with PropertyResolver = resolver }
         
-    Chain(dbPediaProvider, contextCreator, resolver) |> Clone ("FSharp.Data", "Chained")
+    Chain(dbPediaProvider, chainResolver) |> Clone ("FSharp.Data", "Chained")
 
 [<TypeProvider>]
 type CsvDbPediaProvider(config) = inherit TypeProviderExpression(Lengthify(config) |> Desimplify)

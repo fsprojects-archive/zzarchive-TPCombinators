@@ -65,8 +65,20 @@ open FSharp.ProvidedTypes.SimplifiedAlgebra
 //        | None -> tp1.GetInvokerExpresion(methodBase,args)
 
 
+type ChainResolver<'T> =
+  { ContextCreator : obj[] * ISimpleTypeDefinition -> 'T
+    FieldResolver : 'T * ISimpleLiteralField -> ISimpleLiteralField option
+    PropertyResolver : 'T * ISimpleProperty -> ISimpleProperty option
+    EventResolver : 'T * ISimpleEvent -> ISimpleEvent option }
+
+let defaultResolver makeContext =
+  { ContextCreator = makeContext
+    FieldResolver = fun _ -> None
+    PropertyResolver = fun _ -> None
+    EventResolver = fun _ -> None }
+
 /// Clones namespaces, type providers, types and members provided by tp, renaming namespace nsp1 into namespace nsp2.
-let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) contextCreator : (obj[] * ISimpleTypeDefinition -> 'T),  resolver: ('T * ISimpleProperty -> ISimpleProperty option)) = 
+let Chain<'T>(tp: ISimpleTypeProvider, resolver : ChainResolver<'T>) =  // contextCreator : (obj[] * ISimpleTypeDefinition -> 'T),  resolver: ('T * ISimpleProperty -> ISimpleProperty option)) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
 
@@ -104,7 +116,7 @@ let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) con
             | :? IWraps<'T option> as state ->  state.Value
             | _ -> None
 
-    and TxMethod declTy isTarget (inp: ISimpleMethod) =
+    and TxMethod declTy (inp: ISimpleMethod) =
 
         { new ISimpleMethod with 
             override __.Name              = inp.Name  
@@ -125,7 +137,7 @@ let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) con
 
       let trans = 
           match FindGoverningTransObj declTy with
-          | Some transObj -> resolver (transObj, inp) 
+          | Some transObj -> resolver.PropertyResolver (transObj, inp) 
           | None -> None
 
       match trans with
@@ -189,7 +201,7 @@ let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) con
             override __.Interfaces = inp.Interfaces |> Array.map TxType
 
             override __.Constructors = inp.Constructors |> Array.map TxConstructor
-            override this.Methods = inp.Methods |> Array.map (TxMethod this false)
+            override this.Methods = inp.Methods |> Array.map (TxMethod this)
             override this.Fields = inp.Fields |> Array.map (TxField this)
             override this.Events = inp.Events |> Array.map (TxEventDefinition this)
             override this.Properties = inp.Properties |> Array.map (TxProperty this)
@@ -200,7 +212,7 @@ let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) con
             override __.CustomAttributes = inp.CustomAttributes 
             override __.ApplyStaticArguments(typePathWithArguments, objs) = 
                 let inpApplied = inp.ApplyStaticArguments(typePathWithArguments, objs) 
-                let dataContextObj = contextCreator (objs, inpApplied)
+                let dataContextObj = resolver.ContextCreator (objs, inpApplied)
                 let inpWrapped = inpApplied |> TxTypeDefinition (Some dataContextObj)
                 inpWrapped
 
@@ -217,7 +229,7 @@ let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) con
             override __.TypeDefinitions = 
                 inp.TypeDefinitions 
                 |> Array.map (fun ty -> 
-                    let ctxtObj = contextCreator ([||], ty)
+                    let ctxtObj = resolver.ContextCreator ([||], ty)
                     ty |> TxTypeDefinition (Some ctxtObj))
             override __.GetTypeDefinition(name) =  inp.GetTypeDefinition(name) |> Option.map (TxTypeDefinition None)
          }
@@ -234,7 +246,7 @@ let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) con
             override x.Dispose() = inp.Dispose()
         }
     
-    TxTypeProviderDefinition(tp1)
+    TxTypeProviderDefinition(tp)
 
 
 
