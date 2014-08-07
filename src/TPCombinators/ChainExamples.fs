@@ -1,5 +1,6 @@
 module ChainExamples
 
+open System.Reflection
 open FSharp.ProvidedTypes.CloneCombinatorOverSimplifiedAlgebra
 open FSharp.ProvidedTypes.ChainCombinator
 open FSharp.ProvidedTypes.SimplifiedAlgebra
@@ -14,6 +15,11 @@ let CsvProvider config =
     let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
     new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location)) |> Simplify
 
+
+let FreebaseProvider config =
+    let FSharpDataAssembly = typeof<FSharp.Data.Runtime.Freebase.FreebaseObject>.Assembly
+    new ProviderImplementation.FreebaseTypeProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location))  :> ITypeProvider
+    
 
 let DbPediaProvider config =
     let FSharpDataDbPediaAssembly = typeof<FSharp.Data.DbPedia>.Assembly
@@ -59,23 +65,35 @@ let v = c.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``
 //
 //ffff <@ failwith "a" @>
 
-
-
-
+//type Foo = FSharp.Data.CsvProvider<
 let Lengthify config = 
-
     let dbPediaProvider = DbPediaProvider config 
-    let contextCreator (staticArgumentValues:obj[], inpApplied : ISimpleTypeDefinition) =
-                let dataContextMethod =
-                    inpApplied.Methods
-                    |> Array.find (fun m -> m.IsStatic && (m.Name = "GetSample" || m.Name = "GetDataContext"))
-                let expr = dataContextMethod.GetImplementation [| |]
-                let dataContextObj = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.EvaluateQuotation(expr)
-                let dataContext = dataContextObj :?> DbPediaAccess.DbPediaDataContextBase
-                dataContext.Connection
-                
 
-    let resolver (connObj:DbPediaAccess.DbPediaConnection,  inp: ISimpleProperty) = 
+    
+    let contextCreator (staticArgumentValues:obj[], inpApplied : ISimpleTypeDefinition) =
+        let dataContextMethodOpt =
+            inpApplied.Methods
+            |> Array.tryFind (fun m -> m.IsStatic && (m.Name = "GetSample" || m.Name = "GetDataContext"))
+
+        dataContextMethodOpt |> Option.map (fun dataContextMethod ->
+            let expr = dataContextMethod.GetImplementation [| |]
+            let dataContextObj = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.EvaluateQuotation(expr)
+            let dataContext = dataContextObj :?> DbPediaAccess.DbPediaDataContextBase
+            dataContext.Connection)
+
+
+    let resolver (connObjOpt:DbPediaAccess.DbPediaConnection option,  inp: ISimpleProperty) = 
+
+        // If no GetDataContext/LoadSample, then no transform
+        match connObjOpt with 
+        | None -> None
+        | Some connObj ->
+
+        // If property is not string, then no transform
+        if not (inp.PropertyType.IsPrimitive typeof<string>) then None else
+
+        let isTarget = (inp.Name = "abstract") // staticValueOfProp.StartsWith("http://freebase.com/")
+        if not isTarget then None else
 
         let staticValueOfProp = 
             let thisv = Var("this", typeof<DbPediaAccess.DbPediaIndividualBase>)
@@ -91,21 +109,50 @@ let Lengthify config =
             let res2 = res :?> string
             res2
 
-        let n = staticValueOfProp.Length
-        let rty = typeof<int>
-        let getImpl = (fun _ -> <@@ n @@>) 
+
+
+(*
+        let ty, getImpl = 
+
+            let tp = CsvProvider config
+            let staticValueOfProp = "data/Titanic.csv"
+            let n1 = tp.Namespaces |> Array.find (fun n -> n.NamespaceName = "FSharp.Data") 
+            let std = n1.TypeDefinitions |> Array.find (fun n -> n.Name = "CsvProvider") 
+            let sparams = [| for sp in std.StaticParameters do 
+                                    if sp.Name = "Sample" then 
+                                        yield (box staticValueOfProp) 
+                                    else 
+                                        assert sp.OptionalValue.IsSome 
+                                        yield sp.OptionalValue.Value |]
+
+            let td = std.ApplyStaticArguments( [| "FSharp"; "Data"; "random_" + staticValueOfProp |], sparams)
+            let getSampleMeth = td.Methods |> Array.find (fun n -> n.Name = "GetSample")
+            let getImpl = (fun _ -> getSampleMeth.GetImplementation [| |]) // GetSample expects no arguments
+            TyApp (SimpleTyDef(td), [| |]), getImpl
+*)
+
+        let ty, getImpl = 
+
+            let tp = FreebaseProvider config
+            let n1 = tp.GetNamespaces() |> Array.find (fun n -> n.NamespaceName = "FSharp.Data") 
+            let td = n1.GetTypes() |> Array.find (fun n -> n.Name = "FreebaseData") 
+            let bindingFlags = BindingFlags.DeclaredOnly ||| BindingFlags.Static ||| BindingFlags.Instance ||| BindingFlags.Public
+            let getSampleMeth = td.GetMethods(bindingFlags) |> Array.find (fun n -> n.Name = "GetDataContext")
+            let getImpl = (fun _ -> tp.GetInvokerExpression(getSampleMeth, [| |])) 
+            TyApp (OtherTyDef(getSampleMeth.ReturnType), [| |]), getImpl
+
+
         { new ISimpleProperty with 
-            override __.Name              = inp.Name  + "_look_ma_i_know_it_has_length_" + string n
+            override __.Name              = inp.Name
             override __.IsStatic          = inp.IsStatic  
-            override __.PropertyType          = TyApp(OtherTyDef rty, [| |])
-            override __.IndexParameters        = inp.IndexParameters
-            override __.CustomAttributes = inp.CustomAttributes 
+            override __.PropertyType          = ty 
+            override __.IndexParameters        = [| |]
+            override __.CustomAttributes = Seq.empty
             override __.GetMethod = Some { new ISimpleAssociatedMethod with member __.GetImplementation(parameters) = getImpl(parameters) }
             override __.SetMethod = None 
-        }
-
-    
-    Clone("FSharp.Data", "Chained", Chain(dbPediaProvider, "abstract", contextCreator, resolver))
+        } |> Some
+        
+    Chain(dbPediaProvider, contextCreator, resolver) |> Clone ("FSharp.Data", "Chained")
 
 [<TypeProvider>]
 type CsvDbPediaProvider(config) = inherit TypeProviderExpression(Lengthify(config) |> Desimplify)
@@ -113,4 +160,3 @@ type CsvDbPediaProvider(config) = inherit TypeProviderExpression(Lengthify(confi
 
 [<assembly:TypeProviderAssembly>] 
 do()
-

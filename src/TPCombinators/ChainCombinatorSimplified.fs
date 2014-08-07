@@ -66,7 +66,7 @@ open FSharp.ProvidedTypes.SimplifiedAlgebra
 
 
 /// Clones namespaces, type providers, types and members provided by tp, renaming namespace nsp1 into namespace nsp2.
-let Chain(tp1: ISimpleTypeProvider, propNameRegEx: string, contextCreator : (obj[] * ISimpleTypeDefinition -> 'T),  resolver: ('T * ISimpleProperty -> ISimpleProperty)) = 
+let Chain(tp1: ISimpleTypeProvider, (*isTarget: (ISimpleProperty -> bool) *) contextCreator : (obj[] * ISimpleTypeDefinition -> 'T),  resolver: ('T * ISimpleProperty -> ISimpleProperty option)) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
 
@@ -123,10 +123,14 @@ let Chain(tp1: ISimpleTypeProvider, propNameRegEx: string, contextCreator : (obj
 
     and TxProperty declTy (inp: ISimpleProperty) = 
 
-      let isTarget = (inp.Name = propNameRegEx)
-      match FindGoverningTransObj declTy with
-      | Some transObj when isTarget -> resolver (transObj, inp)
-      | _ ->
+      let trans = 
+          match FindGoverningTransObj declTy with
+          | Some transObj -> resolver (transObj, inp) 
+          | None -> None
+
+      match trans with
+      | Some res -> res //|> TxProperty declTy
+      | None ->
 
         { new ISimpleProperty with 
 
@@ -210,7 +214,11 @@ let Chain(tp1: ISimpleTypeProvider, propNameRegEx: string, contextCreator : (obj
         { new ISimpleNamespace with
             override __.NestedNamespaces = inp.NestedNamespaces |> Array.map TxNamespaceDefinition
             override __.NamespaceName = inp.NamespaceName 
-            override __.TypeDefinitions = inp.TypeDefinitions |> Array.map (TxTypeDefinition None)
+            override __.TypeDefinitions = 
+                inp.TypeDefinitions 
+                |> Array.map (fun ty -> 
+                    let ctxtObj = contextCreator ([||], ty)
+                    ty |> TxTypeDefinition (Some ctxtObj))
             override __.GetTypeDefinition(name) =  inp.GetTypeDefinition(name) |> Option.map (TxTypeDefinition None)
          }
 
