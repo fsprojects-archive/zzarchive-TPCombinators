@@ -160,4 +160,3 @@ type CsvDbPediaProvider(config) = inherit TypeProviderExpression(Lengthify(confi
 
 [<assembly:TypeProviderAssembly>] 
 do()
-

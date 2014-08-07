@@ -1,4 +1,4 @@
-﻿module FSharp.ProvidedTypes.CloneCombinator
+module FSharp.ProvidedTypes.CloneCombinator
 
 
 open System
@@ -402,4 +402,3 @@ let Clone(nsp1:string, nsp2:string, tp: ITypeProvider) =
         }
     
     TxTypeProviderDefinition(tp)
-
