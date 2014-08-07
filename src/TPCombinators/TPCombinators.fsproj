@@ -26,8 +26,8 @@
     <DocumentationFile>..\..\bin\TPCombinators.XML</DocumentationFile>
     <StartAction>Program</StartAction>
     <StartProgram>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\devenv.exe</StartProgram>
-    <StartArguments>"C:\Users\t-anstev\Documents\Visual Studio 2013\Projects\TPCombinators\tests\TPCombinators.Tests\TPCombinators.Tests.sln"</StartArguments>
-    <StartWorkingDirectory>C:\Users\t-anstev\Documents\Visual Studio 2013\Projects\TPCombinators\tests\TPCombinators.Tests</StartWorkingDirectory>
+    <StartArguments>C:\GitHub\victor-dumitrescu\TPCombinators\TPCombinators.Tests.sln</StartArguments>
+    <StartWorkingDirectory>C:\GitHub\fsprojects\TPCombinators\docs\content</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -62,13 +62,13 @@
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
   <ItemGroup>
+    <Compile Include="CombinatorExamples.fs" />
     <Compile Include="GeneralCombinators.fs" />
-    <Compile Include="CloneCombinator.fs" />
     <Compile Include="SimplifiedAlgebra.fs" />
+    <Compile Include="AddStaticCombinator.fs" />
+    <Compile Include="RegexHideCombinator.fs" />
     <Compile Include="CloneCombinatorOverSimplifiedAlgebra.fs" />
     <Compile Include="ChainCombinatorSimplified.fs" />
-    <Compile Include="ChainExamples.fs" />
-    <Compile Include="Examples.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -78,9 +78,6 @@
     <Reference Include="FSharp.Data">
       <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.dll</HintPath>
       <Private>True</Private>
-    </Reference>
-    <Reference Include="FSharp.Data.DbPedia">
-      <HintPath>..\..\..\FSharp.Data.DbPedia\bin\FSharp.Data.DbPedia.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
       <HintPath>..\..\bin\FSharp.Data.DesignTime.dll</HintPath>
@@ -103,6 +100,10 @@
     </Reference>
     <Reference Include="FSharp.Management.WMI.DesignTime">
       <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.DesignTime.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="FSharp.Management">
+      <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />

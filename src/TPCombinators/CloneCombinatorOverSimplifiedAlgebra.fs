@@ -21,7 +21,7 @@ type System.String with
 
 
 /// Clones namespaces, type providers, types and members provided by tp, renaming namespace nsp1 into namespace nsp2.
-let Clone(nsp1:string, nsp2:string, tp: ISimpleTypeProvider) = 
+let Clone(nsp1:string, nsp2:string) (tp: ISimpleTypeProvider) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
 
