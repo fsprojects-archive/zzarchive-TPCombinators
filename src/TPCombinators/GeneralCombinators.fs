@@ -201,7 +201,7 @@ type internal ProvidedSymbolType(kind: SymbolKind, args: Type list) =
     override __.GetGenericTypeDefinition() = (match kind with SymbolKind.Generic e -> e | _ -> invalidOp "non-generic type")
     override __.IsCOMObjectImpl() = false
     override __.HasElementTypeImpl() = (match kind with SymbolKind.Generic _ -> false | _ -> true)
-    override __.GetElementType() = (match kind,args with (SymbolKind.Array _  | SymbolKind.SDArray | SymbolKind.ByRef | SymbolKind.Pointer),[e] -> e | _ -> invalidOp "not an array, pointer or byref type")
+    override __.GetElementType() = (match kind,args with (SymbolKind.Array _  | SymbolKind.SDArray | SymbolKind.ByRef | SymbolKind.Pointer),[e] -> e | _ -> invalidOp "%A, %A: not an array, pointer or byref type" kind args)
     override this.ToString() = this.FullName
 
     override this.Module : Module                                                                  = notRequired "Module" this.Name
@@ -248,7 +248,7 @@ type internal ProvidedSymbolType(kind: SymbolKind, args: Type list) =
     override this.GetInterfaces()                                                                  = notRequired "GetInterfaces" this.Name
     override this.GetEvent(_name, _bindingAttr)                                                      = notRequired "GetEvent" this.Name
     override this.GetEvents _bindingAttr                                                            = notRequired "GetEvents" this.Name
-    override this.GetProperties _bindingAttr =   notRequired "GetProperties" this.Name
+    override this.GetProperties _bindingAttr                                                        = notRequired "GetProperties" this.Name
     override this.GetPropertyImpl(_name, _bindingAttr, _binder, _returnType, _types, _modifiers)         = notRequired "GetPropertyImpl" this.Name
     override this.GetNestedTypes _bindingAttr                                                       = notRequired "GetNestedTypes" this.Name
     override this.GetNestedType(_name, _bindingAttr)                                                 = notRequired "GetNestedType" this.Name

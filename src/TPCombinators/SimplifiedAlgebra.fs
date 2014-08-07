@@ -405,7 +405,7 @@ let Desimplify(tp: ISimpleTypeProvider) =
         { new ConstructorInfo() with
 
             override __.Name = ".ctor"
-            override __.Attributes = MethodAttributes.Public // see ProvidedTypes.fs, which always returns this value
+            override __.Attributes = MethodAttributes.Public ||| MethodAttributes.RTSpecialName // see ProvidedTypes.fs, which always returns this value
             override __.DeclaringType = declTy
             override __.GetParameters() = inp.Parameters |> Array.map TxParameterDefinition
 

@@ -84,6 +84,8 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
     <Reference Include="TPCombinators">
       <HintPath>..\..\bin\TPCombinators.dll</HintPath>
     </Reference>

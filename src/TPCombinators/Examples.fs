@@ -1,4 +1,4 @@
-﻿module Examples
+module Examples
 
 
 open FSharp.ProvidedTypes.GeneralCombinators
@@ -109,4 +109,3 @@ type SimplifiedExample2Provider(config) = inherit TypeProviderExpression(Simplif
 
 [<assembly:TypeProviderAssembly>] 
 do()
-
