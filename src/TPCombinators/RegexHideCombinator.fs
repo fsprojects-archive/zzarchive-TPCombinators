@@ -130,6 +130,15 @@ let private FilterProvidedProperties (pattern: string, show: bool, restriction: 
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
         }
 
+    and TxMember this (inp: ISimpleMember) =
+        match inp with
+        | Constructor ctor -> Some(Constructor(TxConstructor ctor))
+        | Method meth (*when TxMethodFilter this meth *) -> Some(Method(TxMethod meth))
+        | Field fld -> Some(Field(TxField fld))
+        | Property prop when TxPropertyFilter this prop -> Some(Property(TxProperty prop))
+        | Property prop -> None
+        | Event evt -> Some(Event(TxEventDefinition evt))
+
     and TxType(inp: ISimpleType) = 
         match inp with 
         | TyApp(td, args) -> TyApp(TxTypeDefinitionReference td, Array.map TxType args)
@@ -155,12 +164,7 @@ let private FilterProvidedProperties (pattern: string, show: bool, restriction: 
             override __.BaseType = inp.BaseType |> Option.map TxType
             override __.Interfaces = inp.Interfaces |> Array.map TxType
 
-            override __.Constructors = inp.Constructors |> Array.map TxConstructor
-            override this.Methods = inp.Methods (*|> Array.filter (TxMethodFilter this)*) |> Array.map TxMethod 
-
-            override __.Fields = inp.Fields |> Array.map TxField
-            override __.Events = inp.Events |> Array.map TxEventDefinition
-            override this.Properties = inp.Properties |> Array.filter (TxPropertyFilter this) |> Array.map TxProperty
+            override this.Members = inp.Members |> Array.choose (TxMember this)
             override __.NestedTypes = inp.NestedTypes |> Array.map TxTypeDefinition
             override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition
 

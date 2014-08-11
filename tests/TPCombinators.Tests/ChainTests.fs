@@ -10,6 +10,7 @@ open System
 open System.IO
 //open NUnit.Framework
 
+(*
 module HyperlinkTests = 
     type Original = FSharp.Data.CsvProvider<"hyperlinks.csv">
     let orows = Original.GetSample().Rows 
@@ -40,13 +41,18 @@ module UseOriginalWithStaticParameters =
     let v1 : string = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``
     let v2 : string = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.``abstract``
 
-module UseChainedWithStaticParameters = 
-    type Dbp = Chained.DbPediaProvider<"en">
+*)
+//module UseChainedWithStaticParameters = 
+//    type Dbp = Chained.DbPediaProvider<"en">
+//
+//    let ctxt = Dbp.GetDataContext()
+//
+//    let v1 = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.Sports
+//    let _ = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.``Science and Technology``.Chemistry.Isotopes.Individuals.``Aluminium-21``.Mass.Uncertainty
 
-    let ctxt = Dbp.GetDataContext()
-
-    let v1 = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.Sports
-    let v2 = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.``abstract``.``Arts and Entertainment``
+(*
+    let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
+    let v2 : int = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.abstract_look_ma_i_know_it_has_length_277
 
 module UseOriginalWithoutStaticParameters = 
 
@@ -59,5 +65,11 @@ module UseChainedWithoutStaticParameters =
     let ctxt = Chained.DbPedia.GetDataContext()
     
     let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
+
+*)
+
+//module FileSystemToCsv =
+//    type HomeDir = FSharp.Management.FileSystem<"C:\\Users\\t-anstev">
+//    HomeDir.Documents.``Visual Studio 2013``.Projects.TPCombinators.tests.``TPCombinators.Tests``.``hyperlinks.csv``
 
 

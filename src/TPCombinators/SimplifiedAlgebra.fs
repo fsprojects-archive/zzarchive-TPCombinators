@@ -100,6 +100,13 @@ and ISimpleTypeDefinitionReference =
     | SimpleTyDef of ISimpleTypeDefinition
     | OtherTyDef of Type
 
+and ISimpleMember = 
+    | Constructor of ISimpleConstructor
+    | Method of ISimpleMethod
+    | Field of ISimpleLiteralField
+    | Event of ISimpleEvent
+    | Property of ISimpleProperty
+
 and ISimpleTypeDefinition =
     abstract Name : string
     abstract Assembly : System.Reflection.Assembly
@@ -109,11 +116,7 @@ and ISimpleTypeDefinition =
     abstract BaseType : ISimpleType option
     abstract Interfaces : ISimpleType[]
 
-    abstract Constructors : ISimpleConstructor[]
-    abstract Methods : ISimpleMethod[]
-    abstract Fields : ISimpleLiteralField[]
-    abstract Events : ISimpleEvent[]
-    abstract Properties : ISimpleProperty[]
+    abstract Members : ISimpleMember []
     abstract NestedTypes : ISimpleTypeDefinition[]
 
     // TODO: consider removing these from the simplified model
@@ -142,6 +145,16 @@ and ISimpleTypeProvider =
 
 
 
+// ----------------------------------------------------------------
+
+[<AutoOpen>]
+module SimpleTypeDefinitionExtensions = 
+    type ISimpleTypeDefinition with
+        member x.Properties = x.Members |> Array.choose (function Property p -> Some p | _ -> None)
+        member x.Constructors = x.Members |> Array.choose (function Constructor p -> Some p | _ -> None)
+        member x.Events = x.Members |> Array.choose (function Event p -> Some p | _ -> None)
+        member x.Fields = x.Members |> Array.choose (function Field p -> Some p | _ -> None)
+        member x.Methods = x.Members |> Array.choose (function Method p -> Some p | _ -> None)
 
 // ----------------------------------------------------------------
 // ITypeProvider --> ISimpleTypeProvider
@@ -265,8 +278,11 @@ let Simplify(tp: ITypeProvider) =
             override __.BaseType = inp.BaseType |> nullToOption |> Option.map TxType
             override __.Interfaces = inp.GetInterfaces() |> Array.map TxType
 
-            override __.Constructors = inp.GetConstructors(bindingFlags) |> Array.map TxConstructor
-            override __.Methods = 
+            override __.Members = [|
+                // Yield all constructors as 'Constructor' cases
+                for ctor in inp.GetConstructors(bindingFlags) do yield Constructor(TxConstructor ctor)
+                
+                // Yield all methods that are not 'get_' or other special as 'Method'
                 let methodToRemove = 
                     set [ for p in inp.GetProperties(bindingFlags) do
                             if p.CanRead then yield p.GetGetMethod().Name 
@@ -275,14 +291,19 @@ let Simplify(tp: ITypeProvider) =
                             yield e.GetAddMethod().Name 
                             yield e.GetRemoveMethod().Name 
                          ]
+                for m in inp.GetMethods(bindingFlags) do 
+                    if not (methodToRemove.Contains m.Name) then 
+                        yield Method(TxMethod m)
 
-                [| for m in inp.GetMethods(bindingFlags) do 
-                      if not (methodToRemove.Contains m.Name) then 
-                           yield TxMethod m |]
+                // Yield all fields, events & properties as members
+                for fld in inp.GetFields(bindingFlags) do
+                    yield Field(TxField(fld))
+                for evt in inp.GetEvents(bindingFlags) do
+                    yield Event(TxEventDefinition(evt))
+                for prop in inp.GetProperties(bindingFlags) do
+                    yield Property(TxProperty(prop)) 
+              |]
 
-            override __.Fields = inp.GetFields(bindingFlags) |> Array.map TxField
-            override __.Events = inp.GetEvents(bindingFlags) |> Array.map TxEventDefinition
-            override __.Properties = inp.GetProperties(bindingFlags) |> Array.map TxProperty
             override __.NestedTypes = inp.GetNestedTypes(bindingFlags) |> Array.map TxTypeDefinition
 
             //override __.GetField(name) = inp.GetField(name, bindingFlags) |> nullToOption |> Option.map TxField

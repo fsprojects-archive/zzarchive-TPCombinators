@@ -31,8 +31,8 @@ type CachedTypeDefiniton =
     }
 
 type CachedThing =
-    | Field of CachedField
-    | TypeDef of CachedTypeDefiniton
+    | CField of CachedField
+    | CTypeDef of CachedTypeDefiniton
 
 let Cache (tp: ISimpleTypeProvider) = 
 
@@ -118,11 +118,20 @@ let Cache (tp: ISimpleTypeProvider) =
 
     and TxField(inp: ISimpleLiteralField) = 
         { new ISimpleLiteralField with 
+
             override __.Name = inp.Name 
             override __.FieldType = inp.FieldType |> TxType
             override __.LiteralValue  = inp.LiteralValue 
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
         }
+
+    and TxMember(inp: ISimpleMember) =
+        match inp with
+        | Constructor ctor -> Constructor(TxConstructor ctor)
+        | Method meth -> Method(TxMethod meth)
+        | Field fld -> Field(TxField fld)
+        | Property prop -> Property(TxProperty prop)
+        | Event evt -> Event(TxEventDefinition evt)
 
     and TxType(inp: ISimpleType) = 
         match inp with 
@@ -137,7 +146,7 @@ let Cache (tp: ISimpleTypeProvider) =
         | ISimpleTypeDefinitionReference.SimpleTyDef x -> SimpleTyDef (TxTypeDefinition x)
 
     and TxTypeDefinition(inp: ISimpleTypeDefinition) =
-                 txTable.Get inp <| fun () ->
+      txTable.Get inp <| fun () ->
 
         { new ISimpleTypeDefinition with 
             override __.Name = inp.Name 
@@ -148,11 +157,7 @@ let Cache (tp: ISimpleTypeProvider) =
             override __.BaseType = inp.BaseType |> Option.map TxType
             override __.Interfaces = inp.Interfaces |> Array.map TxType
 
-            override __.Constructors = inp.Constructors |> Array.map TxConstructor
-            override __.Methods = inp.Methods |> Array.map TxMethod
-            override __.Fields = inp.Fields |> Array.map TxField
-            override __.Events = inp.Events |> Array.map TxEventDefinition
-            override __.Properties = inp.Properties |> Array.map TxProperty
+            override __.Members = inp.Members |> Array.map TxMember
             override __.NestedTypes = inp.NestedTypes |> Array.map TxTypeDefinition
             override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition
 
@@ -163,17 +168,15 @@ let Cache (tp: ISimpleTypeProvider) =
 
     /// Transform a provided namespace definition
     let rec TxNamespaceDefinition (inp: ISimpleNamespace) = 
-        
         { new ISimpleNamespace with
             override __.NestedNamespaces = inp.NestedNamespaces |> Array.map TxNamespaceDefinition
             override __.NamespaceName = inp.NamespaceName
             override __.TypeDefinitions = inp.TypeDefinitions |> Array.map TxTypeDefinition
             override __.GetTypeDefinition(name) =  inp.GetTypeDefinition(name) |> Option.map TxTypeDefinition
-            }
+         }
 
     /// Transform an input ITypeProvider
     let TxTypeProviderDefinition (inp: ISimpleTypeProvider) = 
-        
         { new ISimpleTypeProvider with 
             override __.Namespaces = inp.Namespaces |> Array.map TxNamespaceDefinition
 
@@ -183,7 +186,7 @@ let Cache (tp: ISimpleTypeProvider) =
           interface System.IDisposable with 
             override x.Dispose() = inp.Dispose()
         }
-    
+  
     let CacheField (inp: ISimpleLiteralField) =
         {
             Name = inp.Name;

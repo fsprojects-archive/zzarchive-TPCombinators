@@ -120,6 +120,14 @@ let AddStaticParam(name: string, ty: Type, defaultValue) (tp: ISimpleTypeProvide
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
         }
 
+    and TxMember(inp: ISimpleMember) =
+        match inp with
+        | Constructor ctor -> Constructor(TxConstructor ctor)
+        | Method meth -> Method(TxMethod meth)
+        | Field fld -> Field(TxField fld)
+        | Property prop -> Property(TxProperty prop)
+        | Event evt -> Event(TxEventDefinition evt)
+
     and TxType(inp: ISimpleType) = 
         match inp with 
         | TyApp(td, args) -> TyApp(TxTypeDefinitionReference td, Array.map TxType args)
@@ -145,11 +153,7 @@ let AddStaticParam(name: string, ty: Type, defaultValue) (tp: ISimpleTypeProvide
             override __.BaseType = inp.BaseType |> Option.map TxType
             override __.Interfaces = inp.Interfaces |> Array.map TxType
 
-            override __.Constructors = inp.Constructors |> Array.map TxConstructor
-            override __.Methods = inp.Methods |> Array.map TxMethod
-            override __.Fields = inp.Fields |> Array.map TxField
-            override __.Events = inp.Events |> Array.map TxEventDefinition
-            override __.Properties = inp.Properties |> Array.map TxProperty
+            override __.Members = inp.Members |> Array.map TxMember
             override __.NestedTypes = inp.NestedTypes |> Array.map TxTypeDefinition
             override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition
 

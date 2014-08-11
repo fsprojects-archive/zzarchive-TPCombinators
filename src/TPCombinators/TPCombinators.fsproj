@@ -26,7 +26,7 @@
     <DocumentationFile>..\..\bin\TPCombinators.XML</DocumentationFile>
     <StartAction>Program</StartAction>
     <StartProgram>$(DevEnvDir)\devenv.exe</StartProgram>
-    <StartArguments>$(SolutionDir)TPCombinators.Tests.sln</StartArguments>
+    <StartArguments>"$(SolutionDir)TPCombinators.Tests.sln"</StartArguments>
     <StartWorkingDirectory>$(SolutionDir)tests\TPCombinators.Tests</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -69,6 +69,7 @@
     <Compile Include="ChainCombinatorSimplified.fs" />
     <Compile Include="AddStaticCombinator.fs" />
     <Compile Include="RegexHideCombinator.fs" />
+    <Compile Include="CachingCombinator.fs" />
     <Compile Include="ChainExamples.fs" />
     <Compile Include="Examples.fs" />
     <Compile Include="CombinatorExamples.fs" />
