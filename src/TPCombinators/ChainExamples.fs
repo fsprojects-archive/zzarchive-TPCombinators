@@ -7,69 +7,27 @@ open FSharp.ProvidedTypes.SimplifiedAlgebra
 open FSharp.ProvidedTypes.GeneralCombinators
 open Microsoft.FSharp.Core.CompilerServices
 open Microsoft.FSharp.Quotations
+open FSharp.Management.NamespaceProvider
 
-//FSharp.Data.DbPedia.GetDataContext().Ontology.Activity.Game.Individuals.``7 Wonders (board game)``.
-//let r = FSharp.Data.DbPediaSearch<"Person","Antoine Bauza">.SearchResults()
+// instantiate type providers used in chaining
+let FileSystemProvider config =
+    let FSharpManagementAssembly = typeof<FSharp.Management.Registry>.Assembly
+    new FileSystemProvider(ConfigForOtherTypeProvider(config, FSharpManagementAssembly.Location))
 
 let CsvProvider config =
     let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
-    new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location)) |> Simplify
-
-
+    new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location))
+    
 let FreebaseProvider config =
     let FSharpDataAssembly = typeof<FSharp.Data.Runtime.Freebase.FreebaseObject>.Assembly
-    new ProviderImplementation.FreebaseTypeProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location))  :> ITypeProvider
+    new ProviderImplementation.FreebaseTypeProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location))
     
-
 let DbPediaProvider config =
     let FSharpDataDbPediaAssembly = typeof<FSharp.Data.DbPedia>.Assembly
-    new FSharp.Data.DbPediaTypeProvider.DbPediaTypeProvider(ConfigForOtherTypeProvider(config, FSharpDataDbPediaAssembly.Location)) |> Simplify
+    new FSharp.Data.DbPediaTypeProvider.DbPediaTypeProvider(ConfigForOtherTypeProvider(config, FSharpDataDbPediaAssembly.Location))
 
-(*
-// In this example, we chain two type providers:
-//
-//     CsvProvider --> DbPediaProvider
-//
-// such that any string value in the CSV file containing a DBpedia resource link will be replaced with a provided type
-let CsvDbPedia config = 
-
-    let dbPediaProvider = DbPediaProvider config
-    //let RenamedCsvProvider = Clone("FSharp.Data", "Combined", CsvProvider)
-    //Chain(RenamedCsvProvider, DbPediaProvider)
-    let resolver = dbPediaProvider.FreebaseToDbPedia >> (function None -> None | Some uri -> DbPediaProvider.GetTypeByUri uri)
-    
-    Chain(CsvProvider, resolver)
-
-[<TypeProvider>]
-type CsvDbPediaProvider(config) = inherit TypeProviderExpression(CsvDbPedia(config))
-*)
-
-let c = FSharp.Data.DbPedia.GetDataContext()
-
-(*
-c.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``
-
-<@ c.Ontology @>
-
-_c = FSharp.Data.DbPedia.GetDataContext()
-_cOntology = _c.Ontology
-_cHoliday = _cOntology.Holiday
-_cIndividuals = _cHoliday.Individuals
-_c``Anzac Day`` = _cIndividuals.``Anzac Day``
-*)
-
-let v = c.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``
-
-//open Microsoft.FSharp.Quotations
-//let ffff (h: Expr<FSharp.Data.DbPedia.ServiceTypes.Anzac_DayType>) = <@@ (%h).``abstract`` @@>
-//
-//ffff <@ failwith "a" @>
-
-//type Foo = FSharp.Data.CsvProvider<
-let Lengthify config = 
-    let dbPediaProvider = DbPediaProvider config 
-
-    
+// Chain DbPedia --> Freebase
+let DbPediaToFreebase config = 
     let contextCreator (staticArgumentValues:obj[], inpApplied : ISimpleTypeDefinition) =
         let dataContextMethodOpt =
             inpApplied.Methods
@@ -80,7 +38,6 @@ let Lengthify config =
             let dataContextObj = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.EvaluateQuotation(expr)
             let dataContext = dataContextObj :?> DbPediaAccess.DbPediaDataContextBase
             dataContext.Connection)
-
 
     let resolver (connObjOpt:DbPediaAccess.DbPediaConnection option,  inp: ISimpleProperty) = 
 
@@ -109,31 +66,9 @@ let Lengthify config =
             let res2 = res :?> string
             res2
 
-
-
-(*
         let ty, getImpl = 
 
-            let tp = CsvProvider config
-            let staticValueOfProp = "data/Titanic.csv"
-            let n1 = tp.Namespaces |> Array.find (fun n -> n.NamespaceName = "FSharp.Data") 
-            let std = n1.TypeDefinitions |> Array.find (fun n -> n.Name = "CsvProvider") 
-            let sparams = [| for sp in std.StaticParameters do 
-                                    if sp.Name = "Sample" then 
-                                        yield (box staticValueOfProp) 
-                                    else 
-                                        assert sp.OptionalValue.IsSome 
-                                        yield sp.OptionalValue.Value |]
-
-            let td = std.ApplyStaticArguments( [| "FSharp"; "Data"; "random_" + staticValueOfProp |], sparams)
-            let getSampleMeth = td.Methods |> Array.find (fun n -> n.Name = "GetSample")
-            let getImpl = (fun _ -> getSampleMeth.GetImplementation [| |]) // GetSample expects no arguments
-            TyApp (SimpleTyDef(td), [| |]), getImpl
-*)
-
-        let ty, getImpl = 
-
-            let tp = FreebaseProvider config
+            let tp = FreebaseProvider config :> ITypeProvider
             let n1 = tp.GetNamespaces() |> Array.find (fun n -> n.NamespaceName = "FSharp.Data") 
             let td = n1.GetTypes() |> Array.find (fun n -> n.Name = "FreebaseData") 
             let bindingFlags = BindingFlags.DeclaredOnly ||| BindingFlags.Static ||| BindingFlags.Instance ||| BindingFlags.Public
@@ -152,13 +87,58 @@ let Lengthify config =
             override __.SetMethod = None 
         } |> Some
 
-    let chainResolver = { (defaultResolver contextCreator) with PropertyResolver = resolver }
+    let freebaseResolver = { defaultChainResolver with ContextCreator = contextCreator; PropertyResolver = resolver }
         
-    Chain(dbPediaProvider, chainResolver) |> Clone ("FSharp.Data", "Chained")
+    DbPediaProvider config
+    |> Simplify
+    |> Chain freebaseResolver 
+    |> Clone ("FSharp.Data", "DbPediaToFreebase")
+    |> Desimplify
 
 [<TypeProvider>]
-type CsvDbPediaProvider(config) = inherit TypeProviderExpression(Lengthify(config) |> Desimplify)
+type DbPediaFreebaseProvider(config) = inherit TypeProviderExpression(DbPediaToFreebase(config))
 
+// Chain FileSystem --> CSV
+let FileSystemToCsv config =
+
+    let resolver (_, inp: ISimpleLiteralField) = 
+        if not (inp.Name.EndsWith(".csv")) then None else
+
+        let rty, csvSample = 
+            let tp = CsvProvider config :> ITypeProvider
+            let n1 = tp.GetNamespaces() |> Array.find (fun n -> n.NamespaceName = "FSharp.Data") 
+            let td = n1.GetTypes() |> Array.find (fun n -> n.Name = "CsvProvider") 
+            let sparams = [| for sp in tp.GetStaticParameters(td) do 
+                                    if sp.Name = "Sample" then 
+                                        yield inp.LiteralValue
+                                    else 
+                                        assert sp.IsOptional 
+                                        yield sp.RawDefaultValue |]
+            let csvPath = (inp.LiteralValue :?> string).Replace(@"\", @"\\")
+            let csvFile = tp.ApplyStaticArguments(td, [| "FSharp"; "Data"; "CsvProvider,Sample=\"" + csvPath + "\""|], sparams)
+            let bindingFlags = BindingFlags.DeclaredOnly ||| BindingFlags.Static ||| BindingFlags.Instance ||| BindingFlags.Public
+            let getSampleMeth = csvFile.GetMethods(bindingFlags) |> Array.find (fun n -> n.Name = "GetSample")
+            let q = tp.GetInvokerExpression(getSampleMeth, [| |]) // GetSample expects no arguments
+            let csvSample = Microsoft.FSharp.Linq.RuntimeHelpers.LeafExpressionConverter.EvaluateQuotation(q)
+            TyApp(OtherTyDef(getSampleMeth.ReturnType), [||]), csvSample
+
+        { new ISimpleLiteralField with
+            override __.Name                = inp.Name
+            override __.FieldType           = rty
+            override __.CustomAttributes    = Seq.empty
+            override __.LiteralValue        = csvSample
+        } |> Some
+
+    let csvResolver = { defaultChainResolver with FieldResolver = resolver }
+    
+    FileSystemProvider config
+    |> Simplify
+    |> Chain csvResolver
+    |> Clone ("FSharp.Management", "FileSystemToCsv")
+    |> Desimplify
+
+[<TypeProvider>]
+type FileSystemCsvProvider(config) = inherit TypeProviderExpression(FileSystemToCsv(config))
 
 [<assembly:TypeProviderAssembly>] 
 do()
