@@ -111,7 +111,8 @@ type FileSys = CachedFileSys.FileSystem<"C:\\Folder1\\">
 
 [<Test>]
 let ``CSV with metadata caching`` () =
-    let res = FileSys.Folder11.``File2.txt``
+//    let res = FileSys.Folder11.``File2.txt``
+    let res = FileSys.Folder11.``File1.txt``
     printfn "%A" res
 
 //[<Test>]

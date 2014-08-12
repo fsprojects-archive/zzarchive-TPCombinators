@@ -10,6 +10,8 @@ open System.Collections.Generic
 open Microsoft.FSharp.Core.CompilerServices
 open FSharp.ProvidedTypes.GeneralCombinators
 open FSharp.ProvidedTypes.SimplifiedAlgebra
+open System.Security.Cryptography
+open Nessos.FsPickler
 
 type System.String with 
     member s.ReplacePrefix (s1:string, s2:string) =  
@@ -18,21 +20,41 @@ type System.String with
 type CachedField =
     {
         Name: string
-        FieldType: ISimpleType
+//need to sort these out
+//        FieldType: ISimpleType
         LiteralValue: obj
     }
 
 type CachedTypeDefiniton = 
     {
         Name: string
-        DeclaringType: CachedTypeDefiniton option
-        Fields: seq<CachedField>
-        NestedTypes: seq<CachedTypeDefiniton>
+        Fields: list<CachedField>
+        NestedTypes: list<CachedTypeDefiniton>
     }
 
-type CachedThing =
-    | CField of CachedField
-    | CTypeDef of CachedTypeDefiniton
+let CacheField (inp: ISimpleLiteralField) =
+    {
+        Name = inp.Name;
+//        FieldType = inp.FieldType;
+        LiteralValue = inp.LiteralValue
+    }
+
+let rec private CacheTypeDefinition (inp: ISimpleTypeDefinition) =
+    {
+        Name = inp.Name;
+        Fields = inp.Fields |> List.ofSeq |>List.map CacheField
+        NestedTypes = inp.NestedTypes |> List.ofSeq |> List.map CacheTypeDefinition
+    }
+
+let private hashString (plainText:string) = 
+    let plainTextBytes = Encoding.UTF8.GetBytes(plainText)
+    let hash = new SHA1Managed()
+    let hashBytes = hash.ComputeHash(plainTextBytes)
+    Convert.ToBase64String(hashBytes)
+ 
+//hacky way of dealing with invalid file name chars
+let private replaceChars(s: string) =
+    s.Replace('/', 'ă').Replace('|', 'â')
 
 let Cache (tp: ISimpleTypeProvider) = 
 
@@ -55,83 +77,6 @@ let Cache (tp: ISimpleTypeProvider) =
             override __.OptionalValue = inp.OptionalValue
             override __.CustomAttributes = inp.CustomAttributes  |> TxCustomAttributes
         }
-
-
-    and TxParameter(inp : ISimpleParameter) = 
-        { new ISimpleParameter with 
-
-            override __.Name = inp.Name 
-            override __.ParameterType = inp.ParameterType |> TxType
-            override __.OptionalValue = inp.OptionalValue 
-            override __.IsOut = inp.IsOut 
-            override __.CustomAttributes = inp.CustomAttributes  |> TxCustomAttributes
-        }
- 
-    and TxConstructor(inp: ISimpleConstructor) = 
-        { new ISimpleConstructor with
-
-            override __.Parameters = inp.Parameters |> Array.map TxParameter
-            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
-        }
-
-    and TxMethod(inp: ISimpleMethod) =
-        { new ISimpleMethod with 
-
-            override __.Name              = inp.Name  
-            override __.IsStatic          = inp.IsStatic  
-            override __.Parameters        = inp.Parameters |> Array.map TxParameter
-            override __.ReturnType        = inp.ReturnType  |> TxType
-            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
-        }
-
-    and TxAssociatedMethod(inp: ISimpleAssociatedMethod) =
-        { new ISimpleAssociatedMethod with 
-            override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
-        }
-
-
-    and TxProperty(inp: ISimpleProperty) = 
-        { new ISimpleProperty with 
-
-            override __.Name = inp.Name 
-            override __.IsStatic = inp.IsStatic 
-            override __.PropertyType = inp.PropertyType |> TxType
-            override __.GetMethod = inp.GetMethod |> Option.map TxAssociatedMethod
-            override __.SetMethod = inp.SetMethod |> Option.map TxAssociatedMethod
-            override __.IndexParameters = inp.IndexParameters |> Array.map TxParameter
-            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-
-        }
-
-    and TxEventDefinition(inp: ISimpleEvent) = 
-        { new ISimpleEvent with 
-
-            override __.Name = inp.Name 
-            override __.IsStatic = inp.IsStatic 
-            override __.EventHandlerType = inp.EventHandlerType |> TxType
-            override __.AddMethod = inp.AddMethod |> TxAssociatedMethod
-            override __.RemoveMethod = inp.RemoveMethod |> TxAssociatedMethod
-            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-        }
-
-    and TxField(inp: ISimpleLiteralField) = 
-        { new ISimpleLiteralField with 
-
-            override __.Name = inp.Name 
-            override __.FieldType = inp.FieldType |> TxType
-            override __.LiteralValue  = inp.LiteralValue 
-            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-        }
-
-    and TxMember(inp: ISimpleMember) =
-        match inp with
-        | Constructor ctor -> Constructor(TxConstructor ctor)
-        | Method meth -> Method(TxMethod meth)
-        | Field fld -> Field(TxField fld)
-        | Property prop -> Property(TxProperty prop)
-        | Event evt -> Event(TxEventDefinition evt)
 
     and TxType(inp: ISimpleType) = 
         match inp with 
@@ -157,14 +102,74 @@ let Cache (tp: ISimpleTypeProvider) =
             override __.BaseType = inp.BaseType |> Option.map TxType
             override __.Interfaces = inp.Interfaces |> Array.map TxType
 
-            override __.Members = inp.Members |> Array.map TxMember
+            override __.Members = inp.Members
             override __.NestedTypes = inp.NestedTypes |> Array.map TxTypeDefinition
             override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition
 
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
-            override __.ApplyStaticArguments(typePathWithArguments, objs) = inp.ApplyStaticArguments(typePathWithArguments, objs) |> TxTypeDefinition
+            override __.ApplyStaticArguments(typePathWithArguments, objs) = inp |> ApplyStaticArgs (typePathWithArguments, objs) 
+
             override __.StaticParameters = inp.StaticParameters |> Array.map TxStaticParameter
         }
+
+    and ReconstructMember(inp: CachedField) = 
+        ISimpleMember.Field { new ISimpleLiteralField with 
+
+            override __.Name = inp.Name 
+            override __.FieldType = ISimpleType.FromPrimitive(typeof<System.String>)
+            override __.LiteralValue  = inp.LiteralValue 
+            override __.CustomAttributes = Seq.empty
+        } 
+        
+    and ReconstructTypeDefinition(inp: ISimpleTypeDefinition, decl: ISimpleTypeDefinition option) (cache: CachedTypeDefiniton) =
+        let hasSameName (name: string) (nestedType: CachedTypeDefiniton) =
+            nestedType.Name = name
+        { new ISimpleTypeDefinition with 
+            override this.Name = cache.Name
+            override this.Assembly = inp.Assembly |> TxAssembly 
+            override this.Namespace = inp.Namespace
+            override this.DeclaringType = 
+                match decl with
+                    | None -> inp.DeclaringType
+                    | x -> x
+
+            override this.BaseType = inp.BaseType |> Option.map TxType
+            override this.Interfaces = Array.empty
+
+            override this.Members = cache.Fields |> Array.ofList |> Array.map ReconstructMember 
+            override this.NestedTypes = cache.NestedTypes |> List.toArray |> Array.map (ReconstructTypeDefinition (inp, Some this))
+            override this.GetNestedType(name, declaredOnly) = 
+                    (fun name _ ->
+                        (match List.tryFind (hasSameName name) cache.NestedTypes with
+                            | Some nestedType -> nestedType |> (ReconstructTypeDefinition (inp, Some this)) |> Some
+                            | None -> None
+                                                                   
+                        )) name declaredOnly
+
+            override this.CustomAttributes = Seq.empty
+            override this.ApplyStaticArguments(typePathWithArguments, objs) = failwith "won't fail, doesn't have any"
+
+            override this.StaticParameters = Array.empty
+        }
+
+    and ApplyStaticArgs (typePathWithArguments, objs) (inp: ISimpleTypeDefinition) =
+
+        let fileName = String.concat ";" typePathWithArguments |> hashString
+        let path = String.Concat [Path.GetTempPath(); (replaceChars fileName); ".xml"]
+        let binary = FsPickler.CreateXml()
+
+        let applied = 
+            try
+                let pickle = System.IO.File.ReadAllBytes(path)
+                let cache = binary.UnPickle<CachedTypeDefiniton> pickle
+                cache |> (ReconstructTypeDefinition (inp, None))
+            with
+                | :?System.IO.FileNotFoundException ->
+                    let appliedStaticArgs = inp.ApplyStaticArguments(typePathWithArguments, objs)
+                    let cache = appliedStaticArgs |> (CacheTypeDefinition)
+                    System.IO.File.WriteAllBytes(path, binary.Pickle cache)
+                    appliedStaticArgs
+        applied
 
     /// Transform a provided namespace definition
     let rec TxNamespaceDefinition (inp: ISimpleNamespace) = 
@@ -187,45 +192,30 @@ let Cache (tp: ISimpleTypeProvider) =
             override x.Dispose() = inp.Dispose()
         }
   
-    let CacheField (inp: ISimpleLiteralField) =
-        {
-            Name = inp.Name;
-            FieldType = inp.FieldType;
-            LiteralValue = inp.LiteralValue
-        }
-
-    let rec CacheTypeDefinition (cache: CachedTypeDefiniton) (inp: ISimpleTypeDefinition) =
-        {
-            Name = inp.Name;
-            DeclaringType = cache.DeclaringType;
-            Fields = inp.Fields |> Seq.map CacheField
-            NestedTypes = inp.NestedTypes |> Seq.map (CacheTypeDefinition cache)
-            
-        }
-    
-    let CacheNamespaceDefinition (cache: CachedTypeDefiniton) (inp: ISimpleNamespace) =
-        {
-            Name = inp.NamespaceName;
-            DeclaringType = Some cache;
-            Fields = Seq.empty
-            NestedTypes = inp.TypeDefinitions |> Seq.map (CacheTypeDefinition cache)
-        }
-
-    let CacheTypeProviderDefinition (cache: CachedTypeDefiniton) (inp: ISimpleTypeProvider) =
-        {
-            Name = inp.ToString();
-            DeclaringType = cache.DeclaringType;
-            Fields = Seq.empty;
-            NestedTypes = inp.Namespaces |> Seq.map (CacheNamespaceDefinition cache)
-        }
+   
+//    let CacheNamespaceDefinition (cache: CachedTypeDefiniton) (inp: ISimpleNamespace) =
+//        {
+//            Name = inp.NamespaceName;
+//            DeclaringType = Some cache;
+//            Fields = Seq.empty
+//            NestedTypes = inp.TypeDefinitions |> Seq.map (CacheTypeDefinition cache)
+//        }
+//
+//    let CacheTypeProviderDefinition (cache: CachedTypeDefiniton) (inp: ISimpleTypeProvider) =
+//        {
+//            Name = inp.ToString();
+//            DeclaringType = cache.DeclaringType;
+//            Fields = Seq.empty;
+//            NestedTypes = inp.Namespaces |> Seq.map (CacheNamespaceDefinition cache)
+//        }
     
     
     let a = TxTypeProviderDefinition(tp)
+
+//    let emptyCache = 
+//        {Name="Sysobj"; DeclaringType=None; Fields=Seq.empty; NestedTypes=Seq.empty}
+//    let cache = a |> (CacheTypeProviderDefinition emptyCache)
+
+//    printfn "%A" cache
     
-    let emptyCache = 
-        {Name="Sysobj"; DeclaringType=None; Fields=Seq.empty; NestedTypes=Seq.empty}
-    let cache = a |> (CacheTypeProviderDefinition emptyCache)
-
-    printfn "%A" cache
-
     a
