@@ -26,13 +26,13 @@ let CsvProvider config =
 //let JsonHideProvider config = 
 //    let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
 //    new ProviderImplementation.JsonProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location)) |> Simplify
-//
+
 //let WorldBank config =
 //    let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
 //    new ProviderImplementation.WorldBankProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location)) |> Simplify
 
 let FileSystem config = 
-    let FileSysAssembly = typeof<FSharp.Management.FileSystem<path="C:\\Folder1\\">>.Assembly
+    let FileSysAssembly = typeof<FSharp.Management.Registry>.Assembly
     new FSharp.Management.NamespaceProvider.FileSystemProvider(ConfigForOtherTypeProvider(config, FileSysAssembly.Location)) |> Simplify
 //
 //let CloneExample config = 
@@ -74,18 +74,19 @@ let FileSystem config =
 //    WorldBank config
 //    |> ShowPropertiesInType(".*CO2.*", ".*[iI]ndicator.*")
 //    |> Clone("FSharp.Data", "BankSpace")
-//
-//let CsvAddStatic config = 
-//
-//    CsvProvider config
-//    |> AddStaticParam("OneParameter", typeof<string>, Some("default value" :> obj))
-//    |> Clone("FSharp.Data", "StaticSpace")
+
+let CsvAddStatic config = 
+
+    CsvProvider config
+    |> AddStaticParam("Regex", typeof<string>, Some("default value" :> obj))
+    |> AddStaticParam("Show", typeof<bool>, Some(true :> obj))
+    |> HideStatic
+    |> Clone("FSharp.Data", "StaticSpace")
 
 let FileSysCache config =
     
     FileSystem config
     |> Cache
-//    |> AddStaticParam("UseCachedMetadata", typeof<bool>, Some(false :> obj))
     |> Clone("FSharp.Management", "CachedFileSys")
 
 //[<TypeProvider>]
@@ -109,19 +110,16 @@ let FileSysCache config =
 //[<TypeProvider>]
 //type WBHide(config) = inherit TypeProviderExpression(WorldBankHide(config) |> Desimplify)
 //
-//[<TypeProvider>]
-//type CsvStatic(config) = inherit TypeProviderExpression(CsvAddStatic(config) |> Desimplify)
+[<TypeProvider>]
+type CsvStatic(config) = inherit TypeProviderExpression(CsvAddStatic(config) |> Desimplify)
 
 [<TypeProvider>]
-type CsvCached(config) = inherit TypeProviderExpression(FileSysCache(config) |> Desimplify)
+type FileSysCached(config) = inherit TypeProviderExpression(FileSysCache(config) |> Desimplify)
 
 // CHALLENGE: Make a general purpose "Hide" type provider transformer
 //[<TypeProvider>]
 //type HideProvider(config) = 
 //   ...
-
-
-
 
 
 [<assembly:TypeProviderAssembly>] 

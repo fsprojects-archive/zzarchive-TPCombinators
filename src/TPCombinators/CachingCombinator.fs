@@ -20,8 +20,6 @@ type System.String with
 type CachedField =
     {
         Name: string
-//need to sort these out
-//        FieldType: ISimpleType
         LiteralValue: obj
     }
 
@@ -35,7 +33,6 @@ type CachedTypeDefiniton =
 let CacheField (inp: ISimpleLiteralField) =
     {
         Name = inp.Name;
-//        FieldType = inp.FieldType;
         LiteralValue = inp.LiteralValue
     }
 
@@ -116,8 +113,8 @@ let Cache (tp: ISimpleTypeProvider) =
         ISimpleMember.Field { new ISimpleLiteralField with 
 
             override __.Name = inp.Name 
-            override __.FieldType = ISimpleType.FromPrimitive(typeof<System.String>)
-            override __.LiteralValue  = inp.LiteralValue 
+            override __.FieldType = ISimpleType.FromPrimitive(inp.LiteralValue.GetType())
+            override __.LiteralValue  = inp.LiteralValue
             override __.CustomAttributes = Seq.empty
         } 
         
@@ -133,7 +130,7 @@ let Cache (tp: ISimpleTypeProvider) =
                     | None -> inp.DeclaringType
                     | x -> x
 
-            override this.BaseType = inp.BaseType |> Option.map TxType
+            override this.BaseType = None
             override this.Interfaces = Array.empty
 
             override this.Members = cache.Fields |> Array.ofList |> Array.map ReconstructMember 
@@ -193,29 +190,4 @@ let Cache (tp: ISimpleTypeProvider) =
         }
   
    
-//    let CacheNamespaceDefinition (cache: CachedTypeDefiniton) (inp: ISimpleNamespace) =
-//        {
-//            Name = inp.NamespaceName;
-//            DeclaringType = Some cache;
-//            Fields = Seq.empty
-//            NestedTypes = inp.TypeDefinitions |> Seq.map (CacheTypeDefinition cache)
-//        }
-//
-//    let CacheTypeProviderDefinition (cache: CachedTypeDefiniton) (inp: ISimpleTypeProvider) =
-//        {
-//            Name = inp.ToString();
-//            DeclaringType = cache.DeclaringType;
-//            Fields = Seq.empty;
-//            NestedTypes = inp.Namespaces |> Seq.map (CacheNamespaceDefinition cache)
-//        }
-    
-    
-    let a = TxTypeProviderDefinition(tp)
-
-//    let emptyCache = 
-//        {Name="Sysobj"; DeclaringType=None; Fields=Seq.empty; NestedTypes=Seq.empty}
-//    let cache = a |> (CacheTypeProviderDefinition emptyCache)
-
-//    printfn "%A" cache
-    
-    a
+    TxTypeProviderDefinition(tp)

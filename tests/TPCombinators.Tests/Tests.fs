@@ -26,8 +26,11 @@ let msft = "http://ichart.finance.yahoo.com/table.csv?s=MSFT"
 //type Ex = Corp.XmlProvider<"../../src/TPCombinators/data/a01.xml">
 //type GeoJson = Geo.JsonProvider<"../../docs/content/data/nsg-090714.txt">
 //type WB = BankSpace.WorldBankData
-//type CsvStatic = StaticSpace.CsvProvider<msft, OneParameter="thing">
-type FileSys = CachedFileSys.FileSystem<"C:\\Folder1\\">
+
+type CsvStatic = StaticSpace.CsvProvider<msft, Regex="[cC]lose", Show=false>
+type AnotherStatic = StaticSpace.CsvProvider<msft, Regex="[oO]pen", Show=false>
+
+type FileSys = CachedFileSys.FileSystem<path="C:\\Folder1\\">
 
 //type FileSys = NewSpace.FileSystem<"C:\\">
 
@@ -98,21 +101,24 @@ type FileSys = CachedFileSys.FileSystem<"C:\\Folder1\\">
 //    printfn "%A" context2.Countries.Andorra.Indicators.``(%) Generosity of All Social Insurance``.Values
 //
 //
-//[<Test>]
-//let ``CSV add static parameter`` () =
-//    let res = CsvStatic.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
-//    let res2 = OriginalCsv.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
-//    
-//    let firstRow = Seq.head res.Rows
-//    for row in res.Rows do
-//        printfn "%A" row.Close
-//
-//    printfn "%A" firstRow.High
+[<Test>]
+let ``CSV add static parameter`` () = 
+    let res = AnotherStatic.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
+    let res2 = OriginalCsv.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
+    
+    for row in res.Rows do
+        printfn "%A" row.Open
 
 [<Test>]
-let ``CSV with metadata caching`` () =
-//    let res = FileSys.Folder11.``File2.txt``
-    let res = FileSys.Folder11.``File1.txt``
+let ``CSV add static parameter 2`` () = 
+    let res = CsvStatic.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
+    
+    for row in res.Rows do
+        printfn "%A" row.Close
+
+[<Test>]
+let ``FileSys with metadata caching`` () =
+    let res = FileSys.Folder11.``File2.txt``
     printfn "%A" res
 
 //[<Test>]
