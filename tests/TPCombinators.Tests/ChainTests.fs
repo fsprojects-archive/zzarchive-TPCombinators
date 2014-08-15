@@ -20,7 +20,7 @@ module HyperlinkTests =
     let urows = Unsimplified1.GetSample().Rows 
     let ulinks = urows |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
 
-    type Unsimplified2 = UnsipmlifiedExample2.CsvProvider<"hyperlinks.csv">
+    type Unsimplified2 = UnsimplifiedExample2.CsvProvider<"hyperlinks.csv">
     let urows2 = Unsimplified2.GetSample().Rows 
     let ulinks2 = urows2 |> Seq.map (fun x -> x.Hyperlink) |> Seq.toArray
 
