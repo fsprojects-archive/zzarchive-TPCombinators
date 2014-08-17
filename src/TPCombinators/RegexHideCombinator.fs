@@ -18,11 +18,7 @@ let MatchOptionRegex (inp: string, pattern: string option) =
       | Some(str) -> Regex.IsMatch(inp, str)
       | None -> true
 
-let private FilterProvidedProperties (patternRaw: string, showRaw: bool, restrictionRaw: string option) (tp: ISimpleTypeProvider) = 
-
-    let pattern = ref patternRaw
-    let show = ref showRaw
-    let restriction = ref restrictionRaw
+let private FilterProvidedProperties rawHiding (tp: ISimpleTypeProvider) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
 
@@ -58,31 +54,40 @@ let private FilterProvidedProperties (patternRaw: string, showRaw: bool, restric
             override __.GetImplementation(parameters) = inp.GetImplementation(parameters)
         }
 
+    and FindHidingSettings (ty: ISimpleTypeDefinition) = 
+      match ty, ty.DeclaringType with
+      | (:? IWraps<string * bool * string option> as hiding), _ -> hiding.Value
+      | _, Some ty -> FindHidingSettings ty
+      | _ -> rawHiding
+
     and TxMethodFilter (declTy: ISimpleTypeDefinition) (inp: ISimpleMethod) =
+        let (pattern, show, restriction)  = FindHidingSettings declTy
+
         //Never hide static methods
         if inp.IsStatic then 
             true
         //Don't hide if a restriction is passed and the type doesn't match it
-        elif not (MatchOptionRegex(declTy.Name + "." + inp.Name, !restriction)) then
+        elif not (MatchOptionRegex(declTy.Name + "." + inp.Name, restriction)) then
             true
         else
             //Either show or hide methods that match the regex depending on the value of "show"
-            if inp.Name.[0..3] = "get_" && Regex.IsMatch(inp.Name.[4..], !pattern) then
-                !show
+            if inp.Name.[0..3] = "get_" && Regex.IsMatch(inp.Name.[4..], pattern) then
+                show
             else 
-                not !show
+                not show
 
     and TxPropertyFilter (declTy: ISimpleTypeDefinition) (inp: ISimpleProperty) = 
-        //If the property does not match the restriction regex, show it
-        
-        if not (MatchOptionRegex(declTy.Name, !restriction)) then
+        let (pattern, show, restriction)  = FindHidingSettings declTy
+
+        //If the property does not match the restriction regex, show it        
+        if not (MatchOptionRegex(declTy.Name, restriction)) then
             true
         else
             //Else, show or hide matching properties depending on the value of "show"
-            if Regex.IsMatch(inp.Name, !pattern) then
-                !show
+            if Regex.IsMatch(inp.Name, pattern) then
+                show
             else
-                not !show
+                not show
 
     and TxMethod(inp: ISimpleMethod) =
         { new ISimpleMethod with 
@@ -156,10 +161,7 @@ let private FilterProvidedProperties (patternRaw: string, showRaw: bool, restric
         | ISimpleTypeDefinitionReference.SimpleTyDef x -> SimpleTyDef (TxTypeDefinition x)
 
     and TxTypeDefinition (inp: ISimpleTypeDefinition) =
-
       txTable.Get inp <| fun () ->
-        let isTarget =  true
-
         { new ISimpleTypeDefinition with 
             override __.Name = inp.Name 
             override __.Assembly = inp.Assembly |> TxAssembly 
@@ -175,12 +177,36 @@ let private FilterProvidedProperties (patternRaw: string, showRaw: bool, restric
 
             override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
             override __.ApplyStaticArguments(typePathWithArguments, objs) = 
-                                //If an empty pattern is passed then we expect to retrieve it from the static arguments
-                                match !pattern with
-                                | "" -> inp |> ApplyStaticArgs(typePathWithArguments, objs)
-                                | _ -> inp.ApplyStaticArguments(typePathWithArguments, objs)
-                                |> TxTypeDefinition
+                //If an empty pattern is passed then we expect to retrieve it from the static arguments
+                match rawHiding with
+                | "", _,_ when inp.DeclaringType = None ->
+                      inp |> ApplyStaticArgs(typePathWithArguments, objs)
+                | _ -> 
+                      inp.ApplyStaticArguments(typePathWithArguments, objs) |> TxTypeDefinition 
             override __.StaticParameters = inp.StaticParameters |> Array.map TxStaticParameter
+        }
+
+    and TxHidingTypeDefinition hiding (inp: ISimpleTypeDefinition) =
+      txTable.Get inp <| fun () ->
+        { new ISimpleTypeDefinition with 
+            override __.Name = inp.Name 
+            override __.Assembly = inp.Assembly |> TxAssembly 
+            override __.Namespace = inp.Namespace 
+            override __.DeclaringType = inp.DeclaringType |> Option.map TxTypeDefinition
+
+            override __.BaseType = inp.BaseType |> Option.map TxType
+            override __.Interfaces = inp.Interfaces |> Array.map TxType
+
+            override this.Members = inp.Members |> Array.choose (TxMember this)
+            override __.NestedTypes = inp.NestedTypes |> Array.map TxTypeDefinition
+            override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map TxTypeDefinition
+
+            override __.CustomAttributes = inp.CustomAttributes |> TxCustomAttributes
+            override __.ApplyStaticArguments(typePathWithArguments, objs) = 
+                failwith "Nested types of types with static arguments cannot have static arguments"
+            override __.StaticParameters = inp.StaticParameters |> Array.map TxStaticParameter
+          interface IWraps<string * bool * string option> with
+            override __.Value = hiding 
         }
 
     and findStaticArgs(staticParams: ISimpleStaticParameter[], name: string, paramType: Type) =
@@ -190,8 +216,6 @@ let private FilterProvidedProperties (patternRaw: string, showRaw: bool, restric
 
     and ApplyStaticArgs (typePathWithArguments, objs) (inp: ISimpleTypeDefinition) =
         
-        if inp.DeclaringType = None then
-
             let regexIndex = findStaticArgs(inp.StaticParameters, "Regex", typeof<string>)
             let showIndex = findStaticArgs(inp.StaticParameters, "Show", typeof<bool>)
 
@@ -200,14 +224,16 @@ let private FilterProvidedProperties (patternRaw: string, showRaw: bool, restric
                                                          x.Name="Restriction" && x.ParameterType=typeof<string option>) 
                                                       inp.StaticParameters
             
-            pattern := objs.[regexIndex] :?> string
-            show := objs.[showIndex] :?> bool
-            restriction :=
+            let pattern = objs.[regexIndex] :?> string
+            let show = objs.[showIndex] :?> bool
+            let restriction =
                 match restrictionIndex with
                 | None -> None
                 | Some(index) -> objs.[index] :?> string option
 
-        inp.ApplyStaticArguments(typePathWithArguments, objs)
+            let newHiding = (pattern, show, restriction)
+            inp.ApplyStaticArguments(typePathWithArguments, objs)
+            |> TxHidingTypeDefinition newHiding
       
     /// Transform a provided namespace definition
     let rec TxNamespaceDefinition (inp: ISimpleNamespace) = 

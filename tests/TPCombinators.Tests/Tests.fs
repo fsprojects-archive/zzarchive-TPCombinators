@@ -108,12 +108,14 @@ let ``CSV add static parameter`` () =
     
     for row in res.Rows do
         printfn "%A" row.Open
+        printfn "%A" row.Close
 
 [<Test>]
 let ``CSV add static parameter 2`` () = 
     let res = CsvStatic.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
     
     for row in res.Rows do
+        printfn "%A" row.Open
         printfn "%A" row.Close
 
 [<Test>]
