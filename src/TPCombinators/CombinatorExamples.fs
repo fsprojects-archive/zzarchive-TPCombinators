@@ -11,6 +11,27 @@ open Microsoft.FSharp.Core.CompilerServices
 open FSharp.Data
 open FSharp.Management
 
+let HideStaticCombinator (tp: ISimpleTypeProvider) =
+    tp
+    |> AddStaticParam("Regex", typeof<string>, Some("" :> obj))
+    |> AddStaticParam("Show", typeof<bool>, Some(true :> obj))
+    |> AddStaticParam("Restriction", typeof<string>, Some("" :> obj))
+    |> HideStatic
+
+//Hive stuff
+open Hive.HiveRuntime
+[<Literal>]
+let dsn = "Sample Hortonworks Hive DSN; pwd=hadoop"
+
+let HiveProvider config =
+    let HiveAssembly = typeof<Hive.HiveRuntime.HiveDataContext>.Assembly
+    new Hive.HiveRuntime.HiveTypeProviderImplementation(ConfigForOtherTypeProvider(config, HiveAssembly.Location)) |> Simplify
+
+let HiveHide config =
+    HiveProvider config
+    |> HideStaticCombinator
+    |> Clone("Hive", "HideHive")
+
 let CsvProvider config = 
     let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
     new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location)) |> Simplify
@@ -78,9 +99,7 @@ let FileSystem config =
 let CsvAddStatic config = 
 
     CsvProvider config
-    |> AddStaticParam("Regex", typeof<string>, Some("default value" :> obj))
-    |> AddStaticParam("Show", typeof<bool>, Some(true :> obj))
-    |> HideStatic
+    |> HideStaticCombinator
     |> Clone("FSharp.Data", "StaticSpace")
 
 let FileSysCache config =
@@ -115,6 +134,9 @@ type CsvStatic(config) = inherit TypeProviderExpression(CsvAddStatic(config) |> 
 
 [<TypeProvider>]
 type FileSysCached(config) = inherit TypeProviderExpression(FileSysCache(config) |> Desimplify)
+
+[<TypeProvider>]
+type HideHive(config) = inherit TypeProviderExpression(HiveHide(config) |> Desimplify)
 
 // CHALLENGE: Make a general purpose "Hide" type provider transformer
 //[<TypeProvider>]

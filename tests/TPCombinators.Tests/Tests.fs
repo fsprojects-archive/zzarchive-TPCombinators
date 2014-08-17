@@ -2,6 +2,7 @@
 #r @"..\..\bin\FSharp.Data.dll"
 #r @"..\..\bin\FSharp.Data.DesignTime.dll"
 #r @"..\..\bin\TPCombinators.dll"
+#r @"..\..\bin\HiveTypeProvider.dll"
 #else
 module TPCombinators.Tests
 #endif
@@ -10,6 +11,9 @@ open System
 open System.IO
 open NUnit.Framework
 open FSharp.Data
+
+open Hive.HiveRuntime
+open Microsoft.FSharp.Linq.NullableOperators
 
 [<Literal>]
 let freebaseKey = "AIzaSyA6hqi2Kru4sEgKW11eAmlAwGBYxOovY74"
@@ -31,6 +35,20 @@ type CsvStatic = StaticSpace.CsvProvider<msft, Regex="[cC]lose", Show=false>
 type AnotherStatic = StaticSpace.CsvProvider<msft, Regex="[oO]pen", Show=false>
 
 type FileSys = CachedFileSys.FileSystem<path="C:\\Folder1\\">
+
+//Hive stuff
+[<Literal>]
+let dsn = "Sample Hortonworks Hive DSN; pwd=hadoop"
+type Conn = HideHive.HiveTypeProvider<dsn, DefaultMetadataTimeout=1000, DefaultQueryTimeout=10000, Regex="sample_08", Show=false>
+let context = Conn.GetDataContext()
+
+[<Test>]
+let ``hiding hive tables`` () =
+    let query = hiveQuery {for row in context.sample_07 do
+                           where (row.salary ?< 20000)
+                           select row.description }
+
+    query.Run() |> ignore
 
 //type FileSys = NewSpace.FileSystem<"C:\\">
 
