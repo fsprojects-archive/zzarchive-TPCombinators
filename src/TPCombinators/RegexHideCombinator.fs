@@ -67,7 +67,7 @@ let private FilterProvidedProperties rawHiding (tp: ISimpleTypeProvider) =
         if inp.IsStatic then 
             true
         //Don't hide if a restriction is passed and the type doesn't match it
-        elif not (MatchOptionRegex(declTy.Name + "." + inp.Name, restriction)) then
+        elif not (MatchOptionRegex(declTy.Name, restriction)) then
             true
         else
             //Either show or hide methods that match the regex depending on the value of "show"
@@ -221,7 +221,7 @@ let private FilterProvidedProperties rawHiding (tp: ISimpleTypeProvider) =
 
             //Try to find the optional "Restriction" static argument
             let restrictionIndex = Array.tryFindIndex (fun (x: ISimpleStaticParameter) -> 
-                                                         x.Name="Restriction" && x.ParameterType=typeof<string option>) 
+                                                         x.Name="Restriction" && x.ParameterType=typeof<string>) 
                                                       inp.StaticParameters
             
             let pattern = objs.[regexIndex] :?> string
@@ -229,7 +229,7 @@ let private FilterProvidedProperties rawHiding (tp: ISimpleTypeProvider) =
             let restriction =
                 match restrictionIndex with
                 | None -> None
-                | Some(index) -> objs.[index] :?> string option
+                | Some(index) -> Some (objs.[index] :?> string)
 
             let newHiding = (pattern, show, restriction)
             inp.ApplyStaticArguments(typePathWithArguments, objs)

@@ -114,8 +114,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="HiveTypeProvider">
-      <HintPath>..\..\packages\FSharp.Data.HiveProvider.0.0.2\lib\net40\HiveTypeProvider.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\bin\HiveTypeProvider.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />

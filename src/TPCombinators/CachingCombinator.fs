@@ -152,7 +152,7 @@ let Cache (tp: ISimpleTypeProvider) =
     and ApplyStaticArgs (typePathWithArguments, objs) (inp: ISimpleTypeDefinition) =
 
         let fileName = String.concat ";" typePathWithArguments |> hashString
-        let path = String.Concat [Path.GetTempPath(); (replaceChars fileName); ".xml"]
+        let path = String.Concat [(replaceChars fileName); ".xml"] 
         let binary = FsPickler.CreateXml()
 
         let applied = 
