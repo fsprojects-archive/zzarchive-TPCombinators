@@ -3,17 +3,22 @@
 open FSharp.ProvidedTypes.GeneralCombinators
 open FSharp.ProvidedTypes.CloneCombinatorOverSimplifiedAlgebra
 open FSharp.ProvidedTypes.RegexHideCombinator
-open FSharp.ProvidedTypes.ChainCombinator
 open FSharp.ProvidedTypes.SimplifiedAlgebra
 open FSharp.ProvidedTypes.AddStaticCombinator
+open FSharp.ProvidedTypes.CachingCombinator
+
 open Microsoft.FSharp.Core.CompilerServices
 open FSharp.Data
+open FSharp.Management
+open Hive.HiveRuntime
 
-// This fetches an instance of the type provider we wish to transform. 
+let HiveProvider config =
+    let HiveAssembly = typeof<Hive.HiveRuntime.HiveDataContext>.Assembly
+    new Hive.HiveRuntime.HiveTypeProviderImplementation(ConfigForOtherTypeProvider(config, HiveAssembly.Location)) |> Simplify
+
 let CsvProvider config = 
     let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
     new ProviderImplementation.CsvProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location)) |> Simplify
-
 
 let FreebaseProvider config = 
     let FreebaseAssembly = typeof<FSharp.Data.CsvFile>.Assembly
@@ -31,20 +36,37 @@ let WorldBank config =
     let FSharpDataAssembly = typeof<FSharp.Data.CsvFile>.Assembly
     new ProviderImplementation.WorldBankProvider(ConfigForOtherTypeProvider(config, FSharpDataAssembly.Location)) |> Simplify
 
+let FileSystem config = 
+    let FileSysAssembly = typeof<FSharp.Management.Registry>.Assembly
+    new FSharp.Management.NamespaceProvider.FileSystemProvider(ConfigForOtherTypeProvider(config, FileSysAssembly.Location)) |> Simplify
 
-let CloneExample config = 
+//Compose the AddStaticCombinator and the RegexHideCombinator in order to allow the hiding configuration to be passed
+//as static parameters in the script where the transformed TP is used, rather than having to be defined in the compiled assembly.
+let HideStaticCombinator (tp: ISimpleTypeProvider) =
+    tp
+    |> AddStaticParam("Regex", typeof<string>, Some("" :> obj))
+    |> AddStaticParam("Show", typeof<bool>, Some(true :> obj))
+    |> AddStaticParam("Restriction", typeof<string>, Some("" :> obj))
+    |> HideStatic
+
+// CHALLENGE: Make a general purpose "Hide" type provider transformer
+//[<TypeProvider>]
+//type HideProvider(config) = 
+//   ...
+
+//Clone the CSV provider into a new namespace
+let CsvCloneExample config = 
     CsvProvider config 
     |> Clone("FSharp.Data", "MySpace")
 
-let HideCloneExample config = 
 
-    CloneExample(config) 
+let CsvHideExample config = 
+    CsvCloneExample(config) 
     |> HideProperties("D.te")
     |> Clone("MySpace", "HideSpace") 
 
-let ShowExample config = 
-
-    CloneExample(config) 
+let CsvShowExample config = 
+    CsvCloneExample(config) 
     |> ShowProperties("D.te")
     |> Clone("MySpace", "ShowSpace") 
 
@@ -53,45 +75,47 @@ let FreebaseHide config =
     |> HideProperties("Argon")
     |> Clone("FSharp.Data", "Free")
 
-
-let XmlHide config = 
-    XmlProvider config 
-    |> Clone("FSharp.Data", "Corp")
-
+//Hide the geometry properties from a GeoJSON file.
 let JsonHide config =
-    
-    //Hide any geometry properties from the GeoJSON file.
     JsonHideProvider config
     |> HideProperties(".*[gG]eometry.*")
     |> Clone("FSharp.Data", "Geo")
 
+//Hide all WB indicators except those with CO2 data
 let WorldBankHide config = 
-
-    //Hide all indicators except those with CO2 data
     WorldBank config
     |> ShowPropertiesInType(".*CO2.*", ".*[iI]ndicator.*")
     |> Clone("FSharp.Data", "BankSpace")
 
-let CsvAddStatic config = 
+//Use the RegexHide combinator with static parameters
+let HiveHide config =
+    HiveProvider config
+    |> HideStaticCombinator
+    |> Clone("Hive", "HideHive")
 
+//Add a static parameter to the CSV provider (unused)
+let CsvAddStatic config = 
     CsvProvider config
-    |> AddStaticParam("OneParameter", typeof<string>, Some("default value" :> obj))
+    |> HideStaticCombinator
     |> Clone("FSharp.Data", "StaticSpace")
 
-[<TypeProvider>]
-type CloneProvider(config) = inherit TypeProviderExpression(CloneExample(config) |> Desimplify)
+//Use metadata caching with FSharp.Management
+let FileSysCache config =
+    FileSystem config
+    |> Cache
+    |> Clone("FSharp.Management", "CachedFileSys")
 
 [<TypeProvider>]
-type HideCloneProvider(config) = inherit TypeProviderExpression(HideCloneExample(config) |> Desimplify)
+type CsvCloneProvider(config) = inherit TypeProviderExpression(CsvCloneExample(config) |> Desimplify)
 
 [<TypeProvider>]
-type ShowProvider(config) = inherit TypeProviderExpression(ShowExample(config) |> Desimplify)
+type CsvHideProvider(config) = inherit TypeProviderExpression(CsvHideExample(config) |> Desimplify)
+
+[<TypeProvider>]
+type CsvShowProvider(config) = inherit TypeProviderExpression(CsvShowExample(config) |> Desimplify)
 
 [<TypeProvider>]
 type HideFreebaseProvider(config) = inherit TypeProviderExpression(FreebaseHide(config) |> Desimplify)
-
-[<TypeProvider>]
-type XmlHideProvider(config) = inherit TypeProviderExpression(XmlHide(config) |> Desimplify)
 
 [<TypeProvider>]
 type GeoJsonHide(config) = inherit TypeProviderExpression(JsonHide(config) |> Desimplify)
@@ -102,18 +126,11 @@ type WBHide(config) = inherit TypeProviderExpression(WorldBankHide(config) |> De
 [<TypeProvider>]
 type CsvStatic(config) = inherit TypeProviderExpression(CsvAddStatic(config) |> Desimplify)
 
+[<TypeProvider>]
+type FileSysCached(config) = inherit TypeProviderExpression(FileSysCache(config) |> Desimplify)
 
-// CHALLENGE: Make a general purpose "Hide" type provider transformer
-//[<TypeProvider>]
-//type HideProvider(config) = 
-//   ...
-
-
-
-//let FileSystemExample config = 
-//    let FileSysProvider =
-//        let FileSysAssembly = typeof<FSharp.Management.FileSystem<path="C:\\">>.Assembly
-//        new FSharp.Management.NamespaceProvider.FileSystemProvider(ConfigForOtherTypeProvider(config, FileSysAssembly.Location))
+[<TypeProvider>]
+type HideHive(config) = inherit TypeProviderExpression(HiveHide(config) |> Desimplify)
 
 [<assembly:TypeProviderAssembly>] 
 do()

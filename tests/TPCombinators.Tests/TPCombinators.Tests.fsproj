@@ -58,6 +58,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <ItemGroup>
+    <Compile Include="HiveTests.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="ChainTests.fs" />
     <None Include="packages.config" />
@@ -91,6 +92,9 @@
     <Reference Include="FSharp.Management.WMI.DesignTime">
       <HintPath>packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.DesignTime.dll</HintPath>
       <Private>True</Private>
+    </Reference>
+    <Reference Include="HiveTypeProvider">
+      <HintPath>..\..\bin\HiveTypeProvider.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">

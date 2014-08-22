@@ -93,7 +93,8 @@ and ISimpleType =
         | _ -> false
 
     static member FromPrimitive(ty: System.Type) =
-        assert ty.IsPrimitive
+        //should it not also work with strings?
+        assert (ty.IsPrimitive || ty.Equals(typeof<System.String>))
         TyApp(OtherTyDef ty, [| |])
 
 and ISimpleTypeDefinitionReference = 

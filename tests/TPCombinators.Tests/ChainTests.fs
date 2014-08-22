@@ -42,13 +42,13 @@ module UseOriginalWithStaticParameters =
     let v2 : string = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.``abstract``
 
 *)
-module UseChainedWithStaticParameters = 
-    type Dbp = Chained.DbPediaProvider<"en">
-
-    let ctxt = Dbp.GetDataContext()
-
-    let v1 = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.Sports
-    let _ = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.``Science and Technology``.Chemistry.Isotopes.Individuals.``Aluminium-21``.Mass.Uncertainty
+//module UseChainedWithStaticParameters = 
+//    type Dbp = Chained.DbPediaProvider<"en">
+//
+//    let ctxt = Dbp.GetDataContext()
+//
+//    let v1 = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.Sports
+//    let _ = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.``Science and Technology``.Chemistry.Isotopes.Individuals.``Aluminium-21``.Mass.Uncertainty
 
 (*
     let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
@@ -68,7 +68,8 @@ module UseChainedWithoutStaticParameters =
 
 *)
 
-module FileSystemToCsv =
-    type HomeDir = FSharp.Management.FileSystem<"C:\\Users\\t-anstev">
-    HomeDir.Documents.``Visual Studio 2013``.Projects.TPCombinators.tests.``TPCombinators.Tests``.``hyperlinks.csv``
+//module FileSystemToCsv =
+//    type HomeDir = FSharp.Management.FileSystem<"C:\\Users\\t-anstev">
+//    HomeDir.Documents.``Visual Studio 2013``.Projects.TPCombinators.tests.``TPCombinators.Tests``.``hyperlinks.csv``
+
 

@@ -2,11 +2,11 @@
 #r @"..\..\bin\FSharp.Data.dll"
 #r @"..\..\bin\FSharp.Data.DesignTime.dll"
 #r @"..\..\bin\TPCombinators.dll"
+#r @"..\..\bin\HiveTypeProvider.dll"
 #else
 module TPCombinators.Tests
 #endif
 
-open System
 open System.IO
 open NUnit.Framework
 open FSharp.Data
@@ -23,12 +23,8 @@ type Stocks = MySpace.CsvProvider<msft>
 type Hide = HideSpace.CsvProvider<msft>
 type Show = ShowSpace.CsvProvider<msft>
 type FreeHide = Free.FreebaseDataProvider<Key=freebaseKey, UseUnitsOfMeasure=false>
-type Ex = Corp.XmlProvider<"../../src/TPCombinators/data/a01.xml">
 type GeoJson = Geo.JsonProvider<"../../docs/content/data/nsg-090714.txt">
 type WB = BankSpace.WorldBankData
-type CsvStatic = StaticSpace.CsvProvider<msft, OneParameter="thing">
-
-//type FileSys = NewSpace.FileSystem<"C:\\">
 
 
 [<Test>]
@@ -51,26 +47,21 @@ let ``Hide/show desired properties`` () =
     
     let row = Seq.head res.Rows
     let row2 = Seq.head res2.Rows
-    try 
-        //All properties apart from "Date" should be shown
-        printfn "%A" row.Date
-        Assert.Fail()
-    with    
-    | _ -> ()
+
+    
+    //Everything apart from "Date" should be visible
+    printfn "%A" row.Close
 
     //"Date" should be the only visible property
     printfn "%A" row2.Date
 
 [<Test>]
-let ``read xml corpus`` () =
-    let res = Ex.Load("../../src/TPCombinators/data/a01.xml")
-    printfn "%A" res
-
-[<Test>]
 let freebase () =
     let res = FreeHide.GetDataContext()
     let elements = res.``Science and Technology``.Chemistry.``Chemical Elements``.Individuals
-    printfn "%A" elements.Argon
+
+    //"Argon" should be filtered out
+    printfn "%A" elements.Americium
 
     let res2 = FreebaseDataWithKey.GetDataContext()
     let elements2 = res2.``Science and Technology``.Chemistry.``Chemical Elements``.Individuals
@@ -80,35 +71,36 @@ let freebase () =
 [<Test>]
 let geojson () =
     let first = GeoJson.Load("../../docs/content/data/nsg-090714.txt").Features |> Seq.head
-//    let first = res.Features |> Seq.head
+    //No Geometry properties should be present
     printfn "%A" first.Properties.Descriptor
-
-//type BankSpace = Hide<".*[dD]ebt.*", typeof<FSharp.Data.WorldBankDataProvider>>
-//type BankSpace = Hide<".*[dD]ebt.*", FSharp.Data.WorldBankData>
-
 
 [<Test>]
 let ``World Bank clone`` () =
     let context = WB.GetDataContext()
-    printfn "%A" context.Countries.Romania.Indicators.``Commercial service exports (current US$)``.Values
+    //The only indicators show should be those containing "CO2"
     printfn "%A" context.Countries.Afghanistan.Indicators.``CO2 emissions (kg per 2011 PPP $ of GDP)``.Years
-    printfn "%A" context.Countries.Romania.Indicators.``Debt buyback (current US$)``.Values
+    
     let context2 = WorldBankData.GetDataContext()
     printfn "%A" context2.Countries.Andorra.Indicators.``(%) Generosity of All Social Insurance``.Values
 
-
+type FileSys = CachedFileSys.FileSystem<path="C:\\Folder1\\">
 [<Test>]
-let ``CSV add static parameter`` () =
+let ``FileSys with metadata caching`` () =
+    //This will not fail even when these folders and files are not present in the
+    //file system. The Combinator will substitute them with the cached metadata
+    //(currently saved in the Test project folder, but the combinator could be
+    //modified to save it to a different location.
+    let res = FileSys.Folder11.``File2.txt``
+    printfn "%A" res
+
+type CsvStatic = StaticSpace.CsvProvider<msft, Regex="[cC]lose", Show=false>
+[<Test>]
+let ``CSV add static parameter`` () = 
     let res = CsvStatic.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
-    let res2 = OriginalCsv.Load(Path.Combine(__SOURCE_DIRECTORY__, "data/MSFT.csv"))
     
-    let firstRow = Seq.head res.Rows
+    //Should hide the "Close" property.
+    //Another example of this combinator being used with a different type provider 
+    //can be found in HiveTest.fs
     for row in res.Rows do
-        printfn "%A" row.Close
+        printfn "%A" row.Open
 
-    printfn "%A" firstRow.High
-
-//[<Test>]
-//let ``Try filesystem`` () = 
-//    let res = FileSys.GitHub.fsprojects.TPCombinators.tests.``TPCombinators.Tests``.data.``MSFT.csv``.Contains(".csv")
-//    printfn "%A" (res.ToString())
