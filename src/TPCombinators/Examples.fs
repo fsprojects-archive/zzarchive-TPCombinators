@@ -117,3 +117,4 @@ type SimplifiedExample2Provider(config) = inherit TypeProviderExpression(Simplif
 
 [<assembly:TypeProviderAssembly>] 
 do()
+

@@ -42,13 +42,14 @@ module UseOriginalWithStaticParameters =
     let v2 : string = ctxt.Ontology.Holiday.Individuals.``420 (cannabis culture)``.``abstract``
 
 *)
-module UseChainedWithStaticParameters = 
-    type Dbp = DbPediaToFreebase.DbPediaProvider<"en">
 
-    let ctxt = Dbp.GetDataContext()
-
-    let v1 = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.Sports
-    let _ = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.``Science and Technology``.Chemistry.Isotopes.Individuals.``Aluminium-21``.Mass.Uncertainty
+//module UseChainedWithStaticParameters = 
+//    type Dbp = Chained.DbPediaProvider<"en">
+//
+//    let ctxt = Dbp.GetDataContext()
+//
+//    let v1 = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.Sports
+//    let _ = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.``abstract``.``Science and Technology``.Chemistry.Isotopes.Individuals.``Aluminium-21``.Mass.Uncertainty
 
 (*
     let v1 : int = ctxt.Ontology.Holiday.Individuals.``Anzac Day``.abstract_look_ma_i_know_it_has_length_537
@@ -77,3 +78,6 @@ module FileSystemToCsv =
     type HomeDirChained = FileSystemToCsv.FileSystem<"C:\\Users\\t-anstev">
     let firstRow = HomeDirChained.Documents.``hyperlinks.csv``.Rows |> Seq.head
     printfn "First row is %s, %s" firstRow.Description firstRow.Hyperlink
+
+
+

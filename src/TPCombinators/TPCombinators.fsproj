@@ -63,12 +63,14 @@
   </Target>
   <ItemGroup>
     <Compile Include="GeneralCombinators.fs" />
+    <Compile Include="CloneCombinator.fs" />
     <Compile Include="SimplifiedAlgebra.fs" />
     <Compile Include="CloneCombinatorOverSimplifiedAlgebra.fs" />
     <Compile Include="ChainCombinatorSimplified.fs" />
     <Compile Include="AddStaticCombinator.fs" />
     <Compile Include="RegexHideCombinator.fs" />
     <Compile Include="ExtendCombinator.fs" />
+    <Compile Include="CachingCombinator.fs" />
     <Compile Include="ChainExamples.fs" />
     <Compile Include="ExtendExamples.fs" />
     <Compile Include="Examples.fs" />
@@ -107,6 +109,13 @@
     <Reference Include="FSharp.Management.WMI.DesignTime">
       <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.WMI.DesignTime.dll</HintPath>
       <Private>True</Private>
+    </Reference>
+    <Reference Include="FsPickler">
+      <HintPath>..\..\packages\FsPickler.0.9.10\lib\net45\FsPickler.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="HiveTypeProvider">
+      <HintPath>..\..\bin\HiveTypeProvider.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
