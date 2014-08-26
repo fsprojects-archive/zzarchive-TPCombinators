@@ -1,4 +1,4 @@
-module FSharp.ProvidedTypes.ChainCombinator
+module FSharp.ProvidedTypes.ExtendCombinator
 
 open System
 open System.Text
@@ -12,69 +12,16 @@ open Microsoft.FSharp.Quotations
 open FSharp.ProvidedTypes.GeneralCombinators
 open FSharp.ProvidedTypes.SimplifiedAlgebra
 
-
-// PropertyInfo = name + static type + how to evaluate = (string * Type * how-to-evaluate)
-
-
-
-//let Chain(tp1: ITypeProvider, resolver: (PropertyInfo -> (string * Type) list), ?propNameFilter:string) = 
-//let Chain(tp1: ITypeProvider, resolver: (PropertyInfo -> PropertyInfo list)) = 
-//let Chain(tp1: ITypeProvider, resolver: (string -> Type option)) = 
-
-// Chain(FS, (fun obj -> [ "freebase", FBType ]))
-// Chain(DBP, "sameAs", "freebase", (fun stringArray -> [ "freebase", FBType ]))
-
-// MINIMUM NECESSARY FOR FS 
-//
-//    P : string where P ~ "*.csv" --> CSV
-//
-//let Chain(tp1: ITypeProvider, propNameRegEx:string, resolver: (valueOfProperty:string -> (Type * (Expr -> Expr) )) = 
-
-
-
-
-// MINIMUM NECESSARY FOR DB "sameAs" --> FB
-//
-//let Chain(tp1: ISimpleTypeProvider, origPropName:string, producedPropName:string, resolver: (staticValueOfProp:obj -> producedPropStaticType:Type * (Expr -> Expr)))) = 
-
-// For a type provider tp1 that (optionally?) uses the GetDataContext or GetSample pattern,
-// transform all (instance) properties named 'origPropName' to produce a new property 'producedPropName' by
-//   1. evaluating the property statically in a default data context to give staticValueOfProp
-//   2. calling resolver with this value to give producedPropStaticType
-//   3.  of type 'SimplifiedType' whose implementation is given by 'getImpl'
-//
-//let Chain(tp1: ITypeProvider, origPropName:string, producedPropName:string, staticPart: (string[] -> SimplifiedType * getImpl:(Expr[] -> Expr)))) = 
-//
-//    GetProperties() -> 
-//        [ for p in tp1.GetProperties() do 
-//             yield p
-//             if p = origPropName r then 
-//                yield makeProperty (producedName, resolver (eval p))
-//        ]
-// 
-//    GetProperty(reqPropName) -> 
-//        if reqPropName = producedName then 
-//            makeProperty (producedName, resolver (eval p), 
-//                          getImplementation=(fun args -> getImpl(args)   ))
-//        else
-//            tp1.GetProperty(reqPropName)
-//
-//    GetInvokerExpression(methodBase,args) -> 
-//        match getInvoker(methodBase,args) with 
-//        | Some res -> res 
-//        | None -> tp1.GetInvokerExpresion(methodBase,args)
-
-
-type ChainResolver<'T> =
+type ExtendResolver<'T> =
   { ContextCreator : obj[] * ISimpleTypeDefinition -> 'T option
-    MemberResolver : 'T option * ISimpleMember -> ISimpleMember option }
+    MemberGenerator : 'T option * ISimpleTypeDefinition -> ISimpleMember [] }
 
-let defaultChainResolver =
+let defaultExtendResolver =
   { ContextCreator      = fun _ -> None
-    MemberResolver       = fun _ -> None }
+    MemberGenerator     = fun _ -> [||] }
 
-/// Chains two or more type providers together by replacing fields or properties of types in 'tp' by other types, controlled by the implementation of 'resolver'
-let Chain<'T> (resolver : ChainResolver<'T>) (tp: ISimpleTypeProvider) =
+/// Extends a type provider by adding fields, methods and properties to provided types, controlled by the implementation of 'resolver'
+let Extend<'T> (resolver : ExtendResolver<'T>) (tp: ISimpleTypeProvider) = 
 
     let thisAssembly = typedefof<Utils.IWraps<_>>.Assembly
 
@@ -104,15 +51,15 @@ let Chain<'T> (resolver : ChainResolver<'T>) (tp: ISimpleTypeProvider) =
         }
 
     and FindGoverningTransObj declTy  =
-            let rec loop (ty:ISimpleTypeDefinition) = 
-                match ty.DeclaringType with 
-                | Some t -> loop t
-                | None -> ty
-            match loop declTy with 
-            | :? IWraps<'T option> as state ->  state.Value
-            | _ -> None
+        let rec loop (ty:ISimpleTypeDefinition) = 
+            match ty.DeclaringType with 
+            | Some t -> loop t
+            | None -> ty
+        match loop declTy with 
+        | :? IWraps<'T option> as state ->  state.Value
+        | _ -> None
 
-    and TxMethod declTy (inp: ISimpleMethod) =
+    and TxMethod (inp: ISimpleMethod) =
 
         { new ISimpleMethod with 
             override __.Name              = inp.Name  
@@ -129,7 +76,7 @@ let Chain<'T> (resolver : ChainResolver<'T>) (tp: ISimpleTypeProvider) =
         }
 
 
-    and TxProperty declTy (inp: ISimpleProperty) = 
+    and TxProperty (inp: ISimpleProperty) = 
         { new ISimpleProperty with 
 
             override __.Name = inp.Name 
@@ -142,7 +89,7 @@ let Chain<'T> (resolver : ChainResolver<'T>) (tp: ISimpleTypeProvider) =
 
         }
 
-    and TxEventDefinition declTy (inp: ISimpleEvent) = 
+    and TxEventDefinition (inp: ISimpleEvent) = 
         { new ISimpleEvent with 
 
             override __.Name = inp.Name 
@@ -153,7 +100,7 @@ let Chain<'T> (resolver : ChainResolver<'T>) (tp: ISimpleTypeProvider) =
             override __.CustomAttributes = inp.CustomAttributes 
         }
 
-    and TxField declTy (inp: ISimpleLiteralField) = 
+    and TxField (inp: ISimpleLiteralField) = 
         { new ISimpleLiteralField with 
 
             override __.Name = inp.Name 
@@ -162,18 +109,13 @@ let Chain<'T> (resolver : ChainResolver<'T>) (tp: ISimpleTypeProvider) =
             override __.CustomAttributes = inp.CustomAttributes 
         }
 
-    and TxMember declTy (inp: ISimpleMember) =
-        let trans = resolver.MemberResolver (FindGoverningTransObj declTy, inp) 
-        match trans with
-        | Some res -> res     // this result should not be transformed
-        | None ->
-
+    and TxMember(inp: ISimpleMember) =
         match inp with
         | Constructor ctor -> Constructor(TxConstructor ctor)
-        | Method meth -> Method(TxMethod declTy meth)
-        | Field fld -> Field(TxField declTy fld)
-        | Property prop -> Property(TxProperty declTy prop)
-        | Event evt -> Event(TxEventDefinition declTy evt)
+        | Method meth -> Method(TxMethod meth)
+        | Field fld -> Field(TxField fld)
+        | Property prop -> Property(TxProperty prop)
+        | Event evt -> Event(TxEventDefinition evt)
 
     and TxType(inp: ISimpleType) = 
         match inp with 
@@ -199,7 +141,10 @@ let Chain<'T> (resolver : ChainResolver<'T>) (tp: ISimpleTypeProvider) =
             override __.BaseType = inp.BaseType |> Option.map TxType
             override __.Interfaces = inp.Interfaces |> Array.map TxType
 
-            override this.Members = inp.Members |> Array.map (TxMember this)
+            override this.Members = 
+                [| yield! inp.Members |> Array.map TxMember             // transform existing methods unchanged
+                   yield! resolver.MemberGenerator(transState, this) |] // add new members given by resolver
+
             override __.NestedTypes = inp.NestedTypes |> Array.map (TxTypeDefinition None)
             override __.GetNestedType(name, declaredOnly) = inp.GetNestedType(name, declaredOnly) |> Option.map (TxTypeDefinition None)
 

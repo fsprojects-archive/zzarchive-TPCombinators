@@ -43,7 +43,7 @@ module UseOriginalWithStaticParameters =
 
 *)
 module UseChainedWithStaticParameters = 
-    type Dbp = Chained.DbPediaProvider<"en">
+    type Dbp = DbPediaToFreebase.DbPediaProvider<"en">
 
     let ctxt = Dbp.GetDataContext()
 
@@ -69,6 +69,11 @@ module UseChainedWithoutStaticParameters =
 *)
 
 module FileSystemToCsv =
-    type HomeDir = FSharp.Management.FileSystem<"C:\\Users\\t-anstev">
-    HomeDir.Documents.``Visual Studio 2013``.Projects.TPCombinators.tests.``TPCombinators.Tests``.``hyperlinks.csv``
+    // original FileSystemProvider
+    type ProjectRoot = FSharp.Management.RelativePath<"../..">
+    let file = ProjectRoot.docs.content.data.``MSFT.csv``
 
+// chained FileSystemProvider --> CsvProvider
+    type HomeDirChained = FileSystemToCsv.FileSystem<"C:\\Users\\t-anstev">
+    let firstRow = HomeDirChained.Documents.``hyperlinks.csv``.Rows |> Seq.head
+    printfn "First row is %s, %s" firstRow.Description firstRow.Hyperlink

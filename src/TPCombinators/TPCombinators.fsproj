@@ -68,7 +68,9 @@
     <Compile Include="ChainCombinatorSimplified.fs" />
     <Compile Include="AddStaticCombinator.fs" />
     <Compile Include="RegexHideCombinator.fs" />
+    <Compile Include="ExtendCombinator.fs" />
     <Compile Include="ChainExamples.fs" />
+    <Compile Include="ExtendExamples.fs" />
     <Compile Include="Examples.fs" />
     <Compile Include="CombinatorExamples.fs" />
     <Content Include="packages.config" />
@@ -78,14 +80,13 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Data">
-      <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\..\FSharp.Data\bin\FSharp.Data.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Data.DbPedia">
       <HintPath>..\..\lib\FSharp.Data.DbPedia.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
-      <HintPath>..\..\packages\FSharp.Data.2.0.9\lib\net40\FSharp.Data.DesignTime.dll</HintPath>
+      <HintPath>..\..\..\FSharp.Data\bin\FSharp.Data.DesignTime.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Management">
       <HintPath>..\..\packages\FSharp.Management.0.1.1\lib\net40\FSharp.Management.dll</HintPath>
