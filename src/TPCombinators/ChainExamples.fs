@@ -116,9 +116,9 @@ let FileSystemToCsvAndXml config =
 
             let tp, providerName = 
                 if inp.Name.EndsWith(".csv") then 
-                    CsvProvider config :> ITypeProvider, "CsvProvider"
+                    CsvProvider config, "CsvProvider"
                 else 
-                    XmlProvider config :> ITypeProvider, "XmlProvider"
+                    XmlProvider config, "XmlProvider"
 
             let rty, getImpl = 
                 let n1 = tp.GetNamespaces() |> Array.find (fun n -> n.NamespaceName = "FSharp.Data") 
