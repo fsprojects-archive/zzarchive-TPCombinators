@@ -153,3 +153,12 @@ With these operations we could chain combinators over ISimpleTypeProvider like t
 
 There are some problems with this though, it still needs work
 
+
+### Maintainer(s)
+
+- [@victor-dumitrescu](https://github.com/victor-dumitrescu)
+- [@aastevenson](https://github.com/aastevenson)
+- [@dsyme](https://github.com/dsyme)
+
+The default maintainer account for projects under "fsprojects" is [@fsgit](https://github.com/fsgit) - F# Community Project Incubation Space (repo management)
+
