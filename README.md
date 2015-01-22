@@ -1,3 +1,5 @@
+[![Issue Stats](http://issuestats.com/github/fsprojects/TPCombinators/badge/issue)](http://issuestats.com/github/fsprojects/TPCombinators)
+[![Issue Stats](http://issuestats.com/github/fsprojects/TPCombinators/badge/pr)](http://issuestats.com/github/fsprojects/TPCombinators)
 
 # Type Provider Combinator Experiments
 
